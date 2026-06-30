@@ -1,0 +1,20 @@
+[Unit]
+Description=Turtao Surveillance Robot
+After=network.target bluetooth.target sound.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/turtao
+EnvironmentFile=/home/pi/turtao/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/bin/sleep 35
+ExecStart=/home/pi/turtao/venv/bin/python3 core.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

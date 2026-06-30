@@ -1,0 +1,16 @@
+numpy
+pillow
+scipy
+opencv-python
+face_recognition
+flask
+flask-socketio
+pyserial
+smbus2
+adafruit-circuitpython-ina219
+adafruit-blinka
+pyaudio
+openai-whisper
+openwakeword
+python-dotenv
+pybluez2

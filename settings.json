@@ -1,0 +1,17 @@
+{
+  "tts_enabled": true,
+  "tts_threat": true,
+  "tts_gas": true,
+  "tts_tamper": true,
+  "tts_patrol": true,
+  "tts_wake": true,
+  "speed": 0.8,
+  "safe_mode": false,
+  "tolerance": 0.6,
+  "stealth_mode": false,
+  "brightness_threshold": 60,
+  "jbl_mac": "",
+  "strobe_on_threat": true,
+  "ble_auto_disarm": true,
+  "room_fingerprints": {}
+}
