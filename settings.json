@@ -1,0 +1,24 @@
+{
+    "hostname": "turtao.tailnet-name.ts.net",
+    "ble_proximity_enabled": true,
+    "phone_registration": "",
+    "tts_event_toggles": {
+        "threat": true,
+        "low_battery": true,
+        "intruder": true
+    },
+    "intercom_volume": 0.7,
+    "face_tolerance": 0.52,
+    "anti_spoof_enabled": true,
+    "speed": 0.8,
+    "safe_mode": false,
+    "auto_flashbang": false,
+    "stealth_mode": false,
+    "notifications": {
+        "threat": true,
+        "gas_danger": true,
+        "low_battery": true,
+        "tamper": true,
+        "connection_lost": true
+    }
+}

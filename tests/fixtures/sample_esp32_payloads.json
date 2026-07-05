@@ -1,0 +1,6 @@
+[
+    {"temp_dht": 28.5, "humidity_pct": 65.2, "temp_bmp": 28.1, "pressure_hpa": 1013.2, "gas_mq2": 120, "air_quality_mq135": 85, "sound_level": 42.3, "motion": false, "pitch": 0.5, "roll": -0.2, "yaw": 1.1, "accel_x": 0.01, "accel_y": -0.02, "accel_z": 9.81, "tof_fl": 50, "tof_fc": 120, "tof_fr": 200, "tof_down": 300, "voltage": 12.4, "current_ma": 150, "battery_pct": 95.0, "motor_controller_ok": true, "firmware_version": "v2.1.0", "ble_devices": []},
+    {"temp_dht": null, "humidity_pct": null, "temp_bmp": null, "pressure_hpa": null, "gas_mq2": null, "air_quality_mq135": null, "sound_level": null, "motion": null, "pitch": null, "roll": null, "yaw": null, "accel_x": null, "accel_y": null, "accel_z": null, "tof_fl": null, "tof_fc": null, "tof_fr": null, "tof_down": null, "voltage": null, "current_ma": null, "battery_pct": null, "motor_controller_ok": null, "firmware_version": null, "ble_devices": null},
+    "garbage",
+    ""
+]

@@ -1,0 +1,208 @@
+import logging
+from flask import Blueprint, request, send_file
+from turtao.api.errors import APIError
+
+logger = logging.getLogger(__name__)
+
+faces_bp = Blueprint("faces", __name__)
+
+_deps: dict = {}
+
+
+def inject_deps(**kwargs) -> None:
+    _deps.update(kwargs)
+
+
+@faces_bp.route("/api/faces")
+def list_faces():
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+    faces = engine.list_faces()
+    return [
+        {
+            "name": f.name,
+            "thumb_url": f"/api/faces/{f.name}/thumb",
+            "poses": f.pose_count,
+        }
+        for f in faces
+    ]
+
+
+@faces_bp.route("/api/faces/unknowns")
+def list_unknowns():
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+    unknowns = engine.list_unknowns()
+    return [
+        {
+            "id": u.id,
+            "image_url": f"/api/faces/unknowns/{u.id}/thumb",
+            "first_seen": u.first_seen,
+            "cluster_count": u.cluster_count,
+        }
+        for u in unknowns
+    ]
+
+
+@faces_bp.route("/api/faces/<name>/thumb")
+def face_thumb(name: str):
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+    jpeg = engine.get_thumb(name)
+    if jpeg is None:
+        raise APIError("Face not found", "NOT_FOUND", 404)
+    return send_file(jpeg, mimetype="image/jpeg")
+
+
+@faces_bp.route("/api/faces/unknowns/<id>/thumb")
+def unknown_thumb(id: str):
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+    jpeg = engine.get_unknown_thumb(id)
+    if jpeg is None:
+        raise APIError("Unknown face not found", "NOT_FOUND", 404)
+    return send_file(jpeg, mimetype="image/jpeg")
+
+
+@faces_bp.route("/api/faces/enroll/status")
+def enroll_status():
+    enroll = _deps.get("enrollment")
+    if enroll is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
+    return {
+        "active": enroll.active,
+        "pose_index": enroll.pose_index,
+        "poses_total": enroll.poses_total,
+        "quality_issue": enroll.quality_issue,
+    }
+
+
+@faces_bp.route("/api/faces/enroll/start", methods=["POST"])
+def enroll_start():
+    body = request.get_json(silent=True)
+    if not body or "name" not in body:
+        raise APIError("name field required", "VALIDATION_ERROR", 400)
+
+    name = body["name"].strip()
+    if not name:
+        raise APIError("name must not be empty", "VALIDATION_ERROR", 400)
+
+    enroll = _deps.get("enrollment")
+    if enroll is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
+
+    if enroll.active:
+        raise APIError("Enrollment already in progress", "ENROLL_IN_PROGRESS", 409)
+
+    engine = _deps.get("face_engine")
+    if engine is not None and engine.face_exists(name):
+        raise APIError(f"Face '{name}' already exists", "FACE_EXISTS", 409)
+
+    try:
+        enroll.start(name)
+    except Exception as exc:
+        raise APIError(str(exc), "ENROLL_FAILURE", 500) from exc
+
+    return {
+        "active": enroll.active,
+        "pose_index": enroll.pose_index,
+        "poses_total": enroll.poses_total,
+        "quality_issue": enroll.quality_issue,
+    }
+
+
+@faces_bp.route("/api/faces/enroll/capture", methods=["POST"])
+def enroll_capture():
+    enroll = _deps.get("enrollment")
+    if enroll is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
+
+    if not enroll.active:
+        raise APIError("No active enrollment", "NO_ENROLLMENT", 409)
+
+    try:
+        enroll.capture()
+    except Exception as exc:
+        raise APIError(str(exc), "CAPTURE_FAILURE", 500) from exc
+
+    return {
+        "active": enroll.active,
+        "pose_index": enroll.pose_index,
+        "poses_total": enroll.poses_total,
+        "quality_issue": enroll.quality_issue,
+    }
+
+
+@faces_bp.route("/api/faces/enroll/cancel", methods=["POST"])
+def enroll_cancel():
+    enroll = _deps.get("enrollment")
+    if enroll is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
+
+    try:
+        enroll.cancel()
+    except Exception as exc:
+        raise APIError(str(exc), "CANCEL_FAILURE", 500) from exc
+
+    return {"ok": True}
+
+
+@faces_bp.route("/api/faces/promote", methods=["POST"])
+def promote():
+    body = request.get_json(silent=True)
+    if not body or "face_id" not in body or "name" not in body:
+        raise APIError("face_id and name fields required", "VALIDATION_ERROR", 400)
+
+    face_id = body["face_id"].strip()
+    name = body["name"].strip()
+    if not face_id or not name:
+        raise APIError("face_id and name must not be empty", "VALIDATION_ERROR", 400)
+
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+
+    try:
+        engine.promote_unknown(face_id, name)
+    except ValueError as exc:
+        raise APIError(str(exc), "NOT_FOUND", 404) from exc
+    except Exception as exc:
+        raise APIError(str(exc), "PROMOTE_FAILURE", 500) from exc
+
+    return {"ok": True}
+
+
+@faces_bp.route("/api/faces/<name>", methods=["DELETE"])
+def delete_face(name: str):
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+
+    try:
+        engine.delete_face(name)
+    except ValueError as exc:
+        raise APIError(str(exc), "NOT_FOUND", 404) from exc
+    except Exception as exc:
+        raise APIError(str(exc), "DELETE_FAILURE", 500) from exc
+
+    return {"ok": True}
+
+
+@faces_bp.route("/api/faces/unknowns/<id>", methods=["DELETE"])
+def delete_unknown(id: str):
+    engine = _deps.get("face_engine")
+    if engine is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Face engine not available"}, 503
+
+    try:
+        engine.delete_unknown(id)
+    except ValueError as exc:
+        raise APIError(str(exc), "NOT_FOUND", 404) from exc
+    except Exception as exc:
+        raise APIError(str(exc), "DELETE_FAILURE", 500) from exc
+
+    return {"ok": True}

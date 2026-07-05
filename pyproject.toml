@@ -1,0 +1,29 @@
+[project]
+name = "turtao-pi"
+version = "1.0.0"
+description = "Turtao Surveillance Robot - Raspberry Pi Backend"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+exclude = ["tests/", "turtao/gui/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["turtao"]
+omit = ["turtao/gui/*", "tests/*"]
+
+[tool.coverage.report]
+fail_under = 85

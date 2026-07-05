@@ -1,0 +1,11 @@
+__pycache__/
+.ruff_cache/
+*.pyc
+.env
+venv/
+face_data/embeddings/
+face_data/images/
+face_data/unknowns/
+models/
+piper/
+*.onnx

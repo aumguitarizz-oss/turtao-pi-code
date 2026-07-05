@@ -1,0 +1,279 @@
+import pytest
+from unittest.mock import MagicMock
+from flask import Flask
+from flask_cors import CORS
+from flask_sock import Sock
+from turtao.hardware.mocks import MockSerialLink
+
+
+class MockState:
+    mode = "IDLE"
+    connected = False
+    threat_active = False
+    threat_face_crop = None
+    threat_confidence = 0.0
+    threat_timestamp = None
+    battery_percent = 0.0
+    battery_voltage = 0.0
+    battery_current = 0
+    battery_state = "discharging"
+    heading = 0
+    tof_cm = [0, 0, 0, 0]
+    latency_ms = 0
+    temp_c = 0.0
+    humidity_pct = 0
+    pressure_hpa = 0.0
+    gas_mq2 = 0
+    air_quality_mq135 = 0
+    sound_level = 0.0
+    motion = False
+    pitch = 0.0
+    roll = 0.0
+    yaw = 0.0
+    speed = 1.0
+    event_log = []
+    map_grid = []
+    map_trail = []
+
+    def acquire(self):
+        pass
+
+    def release(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+class MockSettings:
+    def __init__(self):
+        self.hostname = ""
+        self.ble_proximity_enabled = True
+        self.phone_registration = ""
+        self.tts_event_toggles = {"threat": True, "low_battery": True, "intruder": True}
+        self.intercom_volume = 0.7
+        self.face_tolerance = 0.52
+        self.anti_spoof_enabled = True
+        self.speed = 0.8
+        self.safe_mode = False
+        self.auto_flashbang = False
+        self.stealth_mode = False
+        self.notifications = {
+            "threat": True, "gas_danger": True, "low_battery": True,
+            "tamper": True, "connection_lost": True,
+        }
+
+    def asdict(self):
+        return {
+            "hostname": self.hostname,
+            "ble_proximity_enabled": self.ble_proximity_enabled,
+            "phone_registration": self.phone_registration,
+            "tts_event_toggles": self.tts_event_toggles,
+            "intercom_volume": self.intercom_volume,
+            "face_tolerance": self.face_tolerance,
+            "anti_spoof_enabled": self.anti_spoof_enabled,
+            "speed": self.speed,
+            "safe_mode": self.safe_mode,
+            "auto_flashbang": self.auto_flashbang,
+            "stealth_mode": self.stealth_mode,
+            "notifications": self.notifications,
+        }
+
+    def save(self):
+        pass
+
+
+class MockEnrollment:
+    def __init__(self):
+        self.active = False
+        self.pose_index = 0
+        self.poses_total = 5
+        self.quality_issue = None
+
+    def start(self, name):
+        self.active = True
+        self.pose_index = 0
+
+    def capture(self):
+        if not self.active:
+            raise RuntimeError("No active enrollment")
+        self.pose_index += 1
+        if self.pose_index >= self.poses_total:
+            self.active = False
+
+    def cancel(self):
+        self.active = False
+        self.pose_index = 0
+
+
+class MockFaceEngine:
+    def __init__(self):
+        self._faces = {}
+        self._unknowns = {}
+
+    def list_faces(self):
+        from types import SimpleNamespace
+        return [
+            SimpleNamespace(name=k, pose_count=v)
+            for k, v in self._faces.items()
+        ]
+
+    def list_unknowns(self):
+        from types import SimpleNamespace
+        return [
+            SimpleNamespace(id=k, first_seen=v["first_seen"], cluster_count=v["cluster_count"])
+            for k, v in self._unknowns.items()
+        ]
+
+    def face_exists(self, name):
+        return name in self._faces
+
+    def get_thumb(self, name):
+        return None if name not in self._faces else b"fake_jpeg"
+
+    def get_unknown_thumb(self, id):
+        return None if id not in self._unknowns else b"fake_jpeg"
+
+    def promote_unknown(self, face_id, name):
+        if face_id not in self._unknowns:
+            raise ValueError(f"Unknown face {face_id} not found")
+        del self._unknowns[face_id]
+        self._faces[name] = 5
+
+    def delete_face(self, name):
+        if name not in self._faces:
+            raise ValueError(f"Face {name} not found")
+        del self._faces[name]
+
+    def delete_unknown(self, id):
+        if id not in self._unknowns:
+            raise ValueError(f"Unknown {id} not found")
+        del self._unknowns[id]
+
+
+class MockBTManager:
+    def get_devices(self):
+        from types import SimpleNamespace
+        return [
+            SimpleNamespace(id="dev1", name="JBL Go 3", rssi=-45, owner=True),
+            SimpleNamespace(id="dev2", name="Pixel 7", rssi=-60, owner=False),
+        ]
+
+
+class MockTTS:
+    def speak(self, text):
+        pass
+
+
+@pytest.fixture
+def mock_state():
+    return MockState()
+
+
+@pytest.fixture
+def mock_settings():
+    return MockSettings()
+
+
+@pytest.fixture
+def mock_serial():
+    return MockSerialLink()
+
+
+@pytest.fixture
+def mock_enrollment():
+    return MockEnrollment()
+
+
+@pytest.fixture
+def mock_face_engine():
+    return MockFaceEngine()
+
+
+@pytest.fixture
+def mock_bt_manager():
+    return MockBTManager()
+
+
+@pytest.fixture
+def mock_tts():
+    return MockTTS()
+
+
+@pytest.fixture(autouse=True)
+def _clear_route_deps():
+    import turtao.api.routes_alert
+    import turtao.api.routes_camera
+    import turtao.api.routes_control
+    import turtao.api.routes_environment
+    import turtao.api.routes_faces
+    import turtao.api.routes_mode
+    import turtao.api.routes_settings
+    import turtao.api.routes_ble
+    import turtao.api.routes_misc
+
+    for mod in [
+        turtao.api.routes_alert,
+        turtao.api.routes_camera,
+        turtao.api.routes_control,
+        turtao.api.routes_environment,
+        turtao.api.routes_faces,
+        turtao.api.routes_mode,
+        turtao.api.routes_settings,
+        turtao.api.routes_ble,
+        turtao.api.routes_misc,
+    ]:
+        mod._deps.clear()
+    yield
+
+
+@pytest.fixture
+def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engine,
+        mock_bt_manager, mock_tts):
+    app = Flask(__name__)
+    CORS(app)
+    app.config["TESTING"] = True
+
+    from turtao.api.routes_alert import alert_bp, inject_deps as inject_alert
+    from turtao.api.routes_camera import camera_bp, inject_deps as inject_camera
+    from turtao.api.routes_control import control_bp, inject_deps as inject_control
+    from turtao.api.routes_environment import environment_bp, inject_deps as inject_env
+    from turtao.api.routes_faces import faces_bp, inject_deps as inject_faces
+    from turtao.api.routes_mode import mode_bp, inject_deps as inject_mode
+    from turtao.api.routes_settings import settings_bp, inject_deps as inject_settings
+    from turtao.api.routes_ble import ble_bp, inject_deps as inject_ble
+    from turtao.api.routes_misc import misc_bp, inject_deps as inject_misc
+
+    inject_alert(state=mock_state)
+    inject_camera(camera=MagicMock())
+    inject_control(state=mock_state, serial=mock_serial)
+    inject_env(state=mock_state)
+    inject_faces(face_engine=mock_face_engine, enrollment=mock_enrollment, config=MagicMock())
+    inject_mode(state=mock_state, serial=mock_serial)
+    inject_settings(settings=mock_settings, tts=mock_tts)
+    inject_ble(bt_manager=mock_bt_manager, settings=mock_settings, serial=mock_serial)
+    inject_misc(state=mock_state, serial=mock_serial, settings=mock_settings)
+
+    app.register_blueprint(alert_bp)
+    app.register_blueprint(camera_bp)
+    app.register_blueprint(control_bp)
+    app.register_blueprint(environment_bp)
+    app.register_blueprint(faces_bp)
+    app.register_blueprint(mode_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(ble_bp)
+    app.register_blueprint(misc_bp)
+
+    from turtao.api.errors import register_error_handlers
+    register_error_handlers(app)
+
+    app.testing = True
+    return app
+
+
+@pytest.fixture
+def client(app):
+    return app.test_client()
