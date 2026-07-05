@@ -18,6 +18,6 @@ def get_alert():
     if st is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
     return {
-        "threat": getattr(st, "threat_active", False),
-        "confidence": getattr(st, "threat_confidence", 0.0),
+        "threat": st.threat_state.active,
+        "confidence": st.threat_state.confidence,
     }

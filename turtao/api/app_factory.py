@@ -40,7 +40,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     alert_bp.inject_deps(state=state)
     environment_bp.inject_deps(state=state)
     mode_bp.inject_deps(state=state, serial=serial_link)
-    control_bp.inject_deps(state=state, serial=serial_link)
+    control_bp.inject_deps(state=state, serial=serial_link, settings=settings)
     faces_bp.inject_deps(face_engine=face_engine, enrollment=enrollment, config=config)
     settings_bp.inject_deps(settings=settings, tts=tts)
     ble_bp.inject_deps(bt_manager=bt_manager, settings=settings, serial=serial_link)

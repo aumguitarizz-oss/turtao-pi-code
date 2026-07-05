@@ -1,3 +1,4 @@
+import json
 import logging
 from flask import Blueprint, request
 from turtao.api.errors import APIError
@@ -15,17 +16,17 @@ def inject_deps(**kwargs) -> None:
 
 @ble_bp.route("/api/ble/devices")
 def ble_devices():
-    bt = _deps.get("bt_manager")
-    if bt is None:
-        return {"error": "SERVICE_UNAVAILABLE", "detail": "Bluetooth not available"}, 503
+    st = _deps.get("state")
+    if st is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
 
-    devices = bt.get_devices()
+    devices = getattr(st, "ble_devices", [])
     return [
         {
-            "id": d.id,
-            "name": d.name,
-            "rssi": d.rssi,
-            "owner": getattr(d, "owner", False),
+            "id": d.get("id", ""),
+            "name": d.get("name", ""),
+            "rssi": d.get("rssi", 0),
+            "owner": d.get("owner", False),
         }
         for d in devices
     ]
@@ -52,8 +53,9 @@ def ble_register():
     ser = _deps.get("serial")
     if ser is not None:
         try:
-            ser.write(f"BLE_REG {mac}\n".encode())
+            cmd = json.dumps({"cmd": "ble_register", "mac": mac})
+            ser.write(cmd + "\n")
         except Exception:
             logger.exception("Failed to send BLE registration to serial")
 
-    return {"ok": True}
+    return {"ok": True, "mac": mac}

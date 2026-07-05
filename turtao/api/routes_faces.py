@@ -148,7 +148,12 @@ def enroll_cancel():
     except Exception as exc:
         raise APIError(str(exc), "CANCEL_FAILURE", 500) from exc
 
-    return {"ok": True}
+    return {
+        "active": enroll.active,
+        "pose_index": enroll.pose_index,
+        "poses_total": enroll.poses_total,
+        "quality_issue": enroll.quality_issue,
+    }
 
 
 @faces_bp.route("/api/faces/promote", methods=["POST"])

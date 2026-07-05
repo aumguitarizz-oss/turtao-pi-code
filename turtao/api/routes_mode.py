@@ -41,12 +41,5 @@ def mode():
     except Exception as exc:
         raise APIError(str(exc), "MODE_FAILURE", 500) from exc
 
-    ser = _deps.get("serial")
-    if ser is not None:
-        try:
-            ser.write(f"MODE {new_mode}\n".encode())
-        except Exception:
-            logger.exception("Failed to send mode to serial")
-
     logger.info("Mode set to %s", new_mode)
     return {"mode": new_mode}

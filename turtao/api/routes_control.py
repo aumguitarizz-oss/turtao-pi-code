@@ -1,3 +1,4 @@
+import json
 import logging
 from flask import Blueprint, request
 from turtao.api.errors import APIError
@@ -7,6 +8,12 @@ logger = logging.getLogger(__name__)
 control_bp = Blueprint("control", __name__)
 
 _deps: dict = {}
+
+PAN_MIN = 5
+PAN_MAX = 175
+TILT_MIN = 60
+TILT_MAX = 120
+MOVE_CLAMP = 0.8
 
 
 def inject_deps(**kwargs) -> None:
@@ -21,6 +28,7 @@ def control():
 
     ser = _deps.get("serial")
     st = _deps.get("state")
+    settings_obj = _deps.get("settings")
 
     speed = body.get("speed")
     nerf = body.get("nerf")
@@ -31,33 +39,42 @@ def control():
     if speed is not None:
         if not isinstance(speed, (int, float)):
             raise APIError("speed must be a number", "VALIDATION_ERROR", 400)
+        if settings_obj is not None:
+            settings_obj.speed = speed
+            try:
+                settings_obj.save()
+            except Exception:
+                logger.exception("Failed to persist speed setting")
         if speed == 0 and safe_mode is True:
             if st is not None:
                 st.mode = "IDLE"
             if ser is not None:
                 try:
-                    ser.write(b'{"cmd":"estop"}\n')
+                    ser.write(json.dumps({"cmd": "estop"}) + "\n")
                 except Exception:
                     logger.exception("Failed to send estop")
             return {"ok": True}
 
-    if ser is not None:
-        parts = []
-        if speed is not None:
-            parts.append(f"SPD {speed}")
-        if nerf is not None:
-            parts.append(f"NERF {int(nerf)}")
-        if safe_mode is not None:
-            parts.append(f"SAFE {int(safe_mode)}")
-        if pan is not None:
-            parts.append(f"PAN {pan}")
-        if tilt is not None:
-            parts.append(f"TILT {tilt}")
-        if parts:
+    if safe_mode is not None and settings_obj is not None:
+        settings_obj.safe_mode = safe_mode
+        try:
+            settings_obj.save()
+        except Exception:
+            logger.exception("Failed to persist safe_mode setting")
+
+    if pan is not None or tilt is not None:
+        cmd_pan = max(PAN_MIN, min(PAN_MAX, int(pan))) if pan is not None else None
+        cmd_tilt = max(TILT_MIN, min(TILT_MAX, int(tilt))) if tilt is not None else None
+        payload: dict = {"cmd": "pan_tilt"}
+        if cmd_pan is not None:
+            payload["pan"] = cmd_pan
+        if cmd_tilt is not None:
+            payload["tilt"] = cmd_tilt
+        if ser is not None:
             try:
-                ser.write(" ".join(parts).encode() + b"\n")
+                ser.write(json.dumps(payload) + "\n")
             except Exception:
-                logger.exception("Failed to send control command")
+                logger.exception("Failed to send pan/tilt command")
 
     return {"ok": True}
 
@@ -75,18 +92,17 @@ def move():
     if not isinstance(ml, (int, float)) or not isinstance(mr, (int, float)):
         raise APIError("ml and mr must be numbers", "VALIDATION_ERROR", 400)
 
-    ml = max(-0.8, min(0.8, float(ml)))
-    mr = max(-0.8, min(0.8, float(mr)))
+    settings_obj = _deps.get("settings")
+    speed_mult = settings_obj.speed if settings_obj is not None else 1.0
 
-    st = _deps.get("state")
-    speed_mult = getattr(st, "speed", 1.0) if st is not None else 1.0
-    ml *= speed_mult
-    mr *= speed_mult
+    ml = max(-MOVE_CLAMP, min(MOVE_CLAMP, float(ml) * speed_mult))
+    mr = max(-MOVE_CLAMP, min(MOVE_CLAMP, float(mr) * speed_mult))
 
     ser = _deps.get("serial")
     if ser is not None:
         try:
-            ser.write(f"MOVE {ml:.2f} {mr:.2f}\n".encode())
+            cmd = json.dumps({"cmd": "move", "ml": round(ml, 2), "mr": round(mr, 2)})
+            ser.write(cmd + "\n")
         except Exception:
             logger.exception("Failed to send move command")
 

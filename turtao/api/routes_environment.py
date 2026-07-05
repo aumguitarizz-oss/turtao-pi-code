@@ -17,21 +17,21 @@ def get_environment():
     st = _deps.get("state")
     if st is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
-    tof = getattr(st, "tof_cm", [0, 0, 0, 0])
+    sd = st.sensor_data
     return {
-        "temp_c": getattr(st, "temp_c", 0.0),
-        "humidity_pct": getattr(st, "humidity_pct", 0),
-        "pressure_hpa": getattr(st, "pressure_hpa", 0.0),
-        "gas_mq2": getattr(st, "gas_mq2", 0),
-        "air_quality_mq135": getattr(st, "air_quality_mq135", 0),
-        "sound_level": getattr(st, "sound_level", 0.0),
-        "motion": getattr(st, "motion", False),
+        "temp_c": sd.temp_c,
+        "humidity_pct": sd.humidity_pct,
+        "pressure_hpa": sd.pressure_hpa,
+        "gas_mq2": sd.gas_mq2,
+        "air_quality_mq135": sd.air_quality_mq135,
+        "sound_level": sd.sound_level,
+        "motion": sd.motion,
         "orientation": {
-            "pitch": getattr(st, "pitch", 0.0),
-            "roll": getattr(st, "roll", 0.0),
-            "yaw": getattr(st, "yaw", 0.0),
+            "pitch": sd.orientation.pitch,
+            "roll": sd.orientation.roll,
+            "yaw": sd.orientation.yaw,
         },
-        "tof_cm": tof,
+        "tof_cm": sd.tof_cm,
     }
 
 
@@ -40,9 +40,10 @@ def get_battery():
     st = _deps.get("state")
     if st is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
+    b = st.battery
     return {
-        "voltage": getattr(st, "battery_voltage", 0.0),
-        "current_ma": getattr(st, "battery_current", 0),
-        "percent": getattr(st, "battery_percent", 0.0),
-        "status": getattr(st, "battery_state", "discharging"),
+        "voltage": b.voltage,
+        "current_ma": b.current_ma,
+        "percent": b.percent,
+        "status": b.status,
     }

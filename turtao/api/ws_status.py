@@ -38,31 +38,33 @@ class StatusBroadcaster:
 
     def _build_status(self) -> dict:
         st = self._state
-        tof = getattr(st, "tof_cm", [0, 0, 0, 0])
+        ts = st.threat_state
+        b = st.battery
+        sd = st.sensor_data
         return {
             "event": "status",
             "data": {
-                "connected": getattr(st, "connected", False),
+                "connected": st.connected,
                 "threat": {
-                    "active": getattr(st, "threat_active", False),
-                    "face_crop": getattr(st, "threat_face_crop", None),
-                    "confidence": getattr(st, "threat_confidence", 0.0),
-                    "timestamp": getattr(st, "threat_timestamp", None),
+                    "active": ts.active,
+                    "face_crop": ts.face_crop,
+                    "confidence": ts.confidence,
+                    "timestamp": ts.timestamp,
                 },
-                "mode": getattr(st, "mode", "IDLE"),
+                "mode": st.mode.value if hasattr(st.mode, "value") else st.mode,
                 "battery": {
-                    "percent": getattr(st, "battery_percent", 0),
-                    "voltage": getattr(st, "battery_voltage", 0.0),
-                    "current": getattr(st, "battery_current", 0),
-                    "state": getattr(st, "battery_state", "discharging"),
+                    "percent": int(b.percent),
+                    "voltage": b.voltage,
+                    "current": b.current_ma,
+                    "state": b.status.upper(),
                 },
-                "heading": getattr(st, "heading", 0),
+                "heading": st.heading,
                 "tof": {
-                    "fl": tof[0] if len(tof) > 0 else 0,
-                    "fc": tof[1] if len(tof) > 1 else 0,
-                    "fr": tof[2] if len(tof) > 2 else 0,
+                    "fl": sd.tof_cm[0] if len(sd.tof_cm) > 0 else 0,
+                    "fc": sd.tof_cm[1] if len(sd.tof_cm) > 1 else 0,
+                    "fr": sd.tof_cm[2] if len(sd.tof_cm) > 2 else 0,
                 },
-                "latency_ms": getattr(st, "latency_ms", 0),
+                "latency_ms": st.latency_ms,
             },
         }
 

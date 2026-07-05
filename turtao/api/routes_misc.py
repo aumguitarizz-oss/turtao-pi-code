@@ -1,3 +1,4 @@
+import json
 import time
 import logging
 from flask import Blueprint, request
@@ -38,11 +39,12 @@ def led():
     ser = _deps.get("serial")
     if ser is not None:
         try:
-            ser.write(f"LED {mode}\n".encode())
+            cmd = json.dumps({"cmd": "led", "mode": mode})
+            ser.write(cmd + "\n")
         except Exception:
             logger.exception("Failed to send LED command to serial")
 
-    return {"ok": True}
+    return {"ok": True, "mode": mode}
 
 
 @misc_bp.route("/api/events")
@@ -51,42 +53,23 @@ def events():
     if st is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
 
-    event_log = getattr(st, "event_log", [])
-    capped = list(event_log)[:50]
     return [
-        {
-            "id": e.id,
-            "type": e.type,
-            "message": e.message,
-            "at": e.at,
-        }
-        for e in capped
+        {"id": e.id, "type": e.type, "message": e.message, "at": e.at}
+        for e in st.events
     ]
 
 
 @misc_bp.route("/api/map")
 def map():
-    st = _deps.get("state")
-    if st is None:
-        return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
-
-    grid = getattr(st, "map_grid", [])
-    trail = getattr(st, "map_trail", [])
-    return {"grid": grid, "trail": trail}
+    return {"grid": [], "trail": []}
 
 
 @misc_bp.route("/api/ota/version")
 def ota_version():
-    ser = _deps.get("serial")
-    if ser is None:
-        return {"error": "SERVICE_UNAVAILABLE", "detail": "Serial not available"}, 503
-
-    try:
-        ver = ser.query("OTA_VERSION\n")
-    except Exception as exc:
-        raise APIError(str(exc), "OTA_QUERY_FAILURE", 500) from exc
-
-    return {"version": ver.strip()}
+    st = _deps.get("state")
+    if st is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
+    return {"version": st.sensor_data.firmware_version or "0.0.0"}
 
 
 @misc_bp.route("/api/ota/update", methods=["POST"])
@@ -96,8 +79,8 @@ def ota_update():
         return {"error": "SERVICE_UNAVAILABLE", "detail": "Serial not available"}, 503
 
     try:
-        ser.write(b"OTA_UPDATE\n")
+        ser.write(json.dumps({"cmd": "ota_update"}) + "\n")
     except Exception as exc:
         raise APIError(str(exc), "OTA_UPDATE_FAILURE", 500) from exc
 
-    return {"ok": True}
+    return {"ok": True, "status": "started"}
