@@ -10,6 +10,7 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description="Turtao Surveillance Robot")
     parser.add_argument("--gui", action="store_true", help="Open development GUI window")
+    parser.add_argument("--mock", action="store_true", help="Use mock hardware (no ESP32/camera required)")
     args = parser.parse_args()
 
     from turtao.logging_config import configure_logging
@@ -24,8 +25,17 @@ def main():
     from turtao.state import AppState
     state = AppState()
 
+    if args.mock:
+        from turtao.hardware.mocks import MockSerialLink, MockCamera
+        serial_link = MockSerialLink()
+        camera = MockCamera()
+        logger.info("Started with MOCK hardware (no ESP32, no camera)")
+    else:
+        serial_link = None
+        camera = None
+
     from turtao.core import TurtaoCore
-    core = TurtaoCore(config=config, settings=settings, state=state)
+    core = TurtaoCore(config=config, settings=settings, state=state, serial_link=serial_link, camera=camera)
 
     if args.gui:
         import threading
