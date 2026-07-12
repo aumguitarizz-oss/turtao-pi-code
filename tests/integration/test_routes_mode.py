@@ -1,3 +1,4 @@
+import json
 import pytest
 
 
@@ -61,8 +62,8 @@ class TestModeRoutes:
         mock_serial.open()
         client.post("/api/mode", json={"mode": "PATROL"})
         assert len(mock_serial.written) >= 1
-        written = mock_serial.written[0]
-        assert b"MODE PATROL" in written
+        payload = json.loads(mock_serial.written[0])
+        assert payload == {"cmd": "mode", "mode": "PATROL"}
 
     def test_state_updated_on_post(self, client, mock_state):
         client.post("/api/mode", json={"mode": "PATROL"})

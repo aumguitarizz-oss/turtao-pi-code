@@ -1,3 +1,4 @@
+import json
 import logging
 from flask import Blueprint, request
 from turtao.api.errors import APIError
@@ -41,6 +42,13 @@ def mode():
         setattr(st, "mode", Mode(new_mode))
     except Exception as exc:
         raise APIError(str(exc), "MODE_FAILURE", 500) from exc
+
+    ser = _deps.get("serial")
+    if ser is not None:
+        try:
+            ser.write(json.dumps({"cmd": "mode", "mode": new_mode}) + "\n")
+        except Exception:
+            logger.exception("Failed to send mode command to serial")
 
     logger.info("Mode set to %s", new_mode)
     return {"mode": new_mode}

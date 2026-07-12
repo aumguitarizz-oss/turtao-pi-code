@@ -5,36 +5,32 @@ from flask import Flask
 from flask_cors import CORS
 from flask_sock import Sock
 from turtao.hardware.mocks import MockSerialLink
+from turtao.state import Mode, ThreatState, BatteryData, SensorData
 
 
 class MockState:
-    mode = "IDLE"
-    connected = False
-    threat_active = False
-    threat_face_crop = None
-    threat_confidence = 0.0
-    threat_timestamp = None
-    battery_percent = 0.0
-    battery_voltage = 0.0
-    battery_current = 0
-    battery_state = "discharging"
-    heading = 0
-    tof_cm = [0, 0, 0, 0]
-    latency_ms = 0
-    temp_c = 0.0
-    humidity_pct = 0
-    pressure_hpa = 0.0
-    gas_mq2 = 0
-    air_quality_mq135 = 0
-    sound_level = 0.0
-    motion = False
-    pitch = 0.0
-    roll = 0.0
-    yaw = 0.0
-    speed = 1.0
-    event_log = []
-    map_grid = []
-    map_trail = []
+    """Test double for AppState. Mirrors the real nested shape (state.py)
+    by composing the actual dataclasses, so route/broadcaster code that
+    reads state.threat_state / state.battery / state.sensor_data works
+    identically against this mock and the real AppState.
+    """
+
+    def __init__(self):
+        self.mode = Mode.IDLE
+        self.connected = False
+        self.threat_state = ThreatState()
+        self.battery = BatteryData()
+        self.sensor_data = SensorData()
+        self.heading = 0
+        self.latency_ms = 0
+        self.speed = 1.0
+        self.event_log = []
+        self.map_grid = []
+        self.map_trail = []
+        self.ble_devices = [
+            {"id": "dev1", "name": "JBL Go 3", "rssi": -45, "owner": True},
+            {"id": "dev2", "name": "Pixel 7", "rssi": -60, "owner": False},
+        ]
 
     def acquire(self):
         pass
@@ -260,12 +256,12 @@ def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engin
 
     inject_alert(state=mock_state)
     inject_camera(camera=MagicMock())
-    inject_control(state=mock_state, serial=mock_serial)
+    inject_control(state=mock_state, serial=mock_serial, settings=mock_settings)
     inject_env(state=mock_state)
     inject_faces(face_engine=mock_face_engine, enrollment=mock_enrollment, config=MagicMock())
     inject_mode(state=mock_state, serial=mock_serial)
     inject_settings(settings=mock_settings, tts=mock_tts)
-    inject_ble(bt_manager=mock_bt_manager, settings=mock_settings, serial=mock_serial)
+    inject_ble(state=mock_state, bt_manager=mock_bt_manager, settings=mock_settings, serial=mock_serial)
     inject_misc(state=mock_state, serial=mock_serial, settings=mock_settings)
 
     app.register_blueprint(alert_bp)

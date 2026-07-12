@@ -1,3 +1,4 @@
+import json
 import pytest
 
 
@@ -26,9 +27,10 @@ class TestBLERoutes:
         mock_serial.open()
         resp = client.post("/api/ble/register", json={"mac": "AA:BB:CC:DD:EE:FF"})
         assert resp.status_code == 200
-        assert resp.get_json() == {"ok": True}
+        assert resp.get_json() == {"ok": True, "mac": "AA:BB:CC:DD:EE:FF"}
         assert mock_settings.phone_registration == "AA:BB:CC:DD:EE:FF"
-        assert mock_serial.written[0] == b"BLE_REG AA:BB:CC:DD:EE:FF\n"
+        payload = json.loads(mock_serial.written[0])
+        assert payload == {"cmd": "ble_register", "mac": "AA:BB:CC:DD:EE:FF"}
 
     def test_register_missing_mac_returns_error(self, client):
         resp = client.post("/api/ble/register", json={})

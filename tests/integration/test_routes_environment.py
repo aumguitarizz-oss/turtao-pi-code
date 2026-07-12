@@ -3,17 +3,17 @@ import pytest
 
 class TestEnvironmentRoutes:
     def test_get_environment_returns_correct_schema(self, client, mock_state):
-        mock_state.temp_c = 25.5
-        mock_state.humidity_pct = 60
-        mock_state.pressure_hpa = 1015.0
-        mock_state.gas_mq2 = 150
-        mock_state.air_quality_mq135 = 90
-        mock_state.sound_level = 35.2
-        mock_state.motion = True
-        mock_state.pitch = 1.2
-        mock_state.roll = -0.5
-        mock_state.yaw = 0.8
-        mock_state.tof_cm = [45, 120, 200, 300]
+        mock_state.sensor_data.temp_c = 25.5
+        mock_state.sensor_data.humidity_pct = 60
+        mock_state.sensor_data.pressure_hpa = 1015.0
+        mock_state.sensor_data.gas_mq2 = 150
+        mock_state.sensor_data.air_quality_mq135 = 90
+        mock_state.sensor_data.sound_level = 35.2
+        mock_state.sensor_data.motion = True
+        mock_state.sensor_data.orientation.pitch = 1.2
+        mock_state.sensor_data.orientation.roll = -0.5
+        mock_state.sensor_data.orientation.yaw = 0.8
+        mock_state.sensor_data.tof_cm = [45, 120, 200, 300]
 
         resp = client.get("/api/environment")
         assert resp.status_code == 200
@@ -41,10 +41,10 @@ class TestEnvironmentRoutes:
         assert data["tof_cm"] == [0, 0, 0, 0]
 
     def test_get_battery_returns_correct_schema(self, client, mock_state):
-        mock_state.battery_voltage = 12.345
-        mock_state.battery_current = 150
-        mock_state.battery_percent = 85.5
-        mock_state.battery_state = "charging"
+        mock_state.battery.voltage = 12.345
+        mock_state.battery.current_ma = 150
+        mock_state.battery.percent = 85.5
+        mock_state.battery.status = "charging"
 
         resp = client.get("/api/battery")
         assert resp.status_code == 200
@@ -65,7 +65,7 @@ class TestEnvironmentRoutes:
         assert data["status"] == "discharging"
 
     def test_environment_tof_cm_structure(self, client, mock_state):
-        mock_state.tof_cm = [10, 20, 30, 40]
+        mock_state.sensor_data.tof_cm = [10, 20, 30, 40]
         resp = client.get("/api/environment")
         data = resp.get_json()
         assert len(data["tof_cm"]) == 4

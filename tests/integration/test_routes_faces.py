@@ -71,13 +71,17 @@ class TestFacesRoutes:
         client.post("/api/faces/enroll/capture")
         resp = client.post("/api/faces/enroll/cancel")
         assert resp.status_code == 200
-        assert resp.get_json() == {"ok": True}
+        assert resp.get_json() == {
+            "active": False, "pose_index": 0, "poses_total": 5, "quality_issue": None,
+        }
         assert mock_enrollment.active is False
 
     def test_enroll_cancel_without_active_returns_error(self, client):
         resp = client.post("/api/faces/enroll/cancel")
         assert resp.status_code == 200
-        assert resp.get_json() == {"ok": True}
+        assert resp.get_json() == {
+            "active": False, "pose_index": 0, "poses_total": 5, "quality_issue": None,
+        }
 
     def test_enroll_status_idle(self, client):
         resp = client.get("/api/faces/enroll/status")

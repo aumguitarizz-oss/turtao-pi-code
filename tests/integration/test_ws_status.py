@@ -9,12 +9,12 @@ class TestStatusBroadcaster:
     def test_build_status_contains_expected_keys(self, mock_state):
         mock_state.mode = "GUARD"
         mock_state.connected = True
-        mock_state.threat_active = True
-        mock_state.threat_confidence = 0.87
-        mock_state.battery_percent = 75.0
-        mock_state.battery_voltage = 12.3
+        mock_state.threat_state.active = True
+        mock_state.threat_state.confidence = 0.87
+        mock_state.battery.percent = 75.0
+        mock_state.battery.voltage = 12.3
         mock_state.heading = 90
-        mock_state.tof_cm = [50, 120, 200, 300]
+        mock_state.sensor_data.tof_cm = [50, 120, 200, 300]
         mock_state.latency_ms = 15
 
         broadcaster = StatusBroadcaster(mock_state)
@@ -98,15 +98,16 @@ class TestStatusBroadcaster:
 
 
 class TestStatusWebSocket:
-    def test_websocket_route_exists(self, app, mock_state):
+    def test_websocket_route_registered(self, app, mock_state):
+        # Flask's synchronous test client has no .websocket() support (that's
+        # Quart-only), so this only verifies wiring: the route is registered.
+        # Client lifecycle behavior (broadcast delivery, timeout resilience)
+        # is covered directly by TestHandleStatusClient below.
         from flask_sock import Sock
         from turtao.api.ws_status import register_status_ws
         sock = Sock(app)
         register_status_ws(sock, mock_state)
-        with app.test_client() as client:
-            with client.websocket("/ws/status") as ws:
-                assert ws is not None
-                ws.send("ping")
+        assert "/ws/status" in [rule.rule for rule in app.url_map.iter_rules()]
 
 
 class TestHandleStatusClient:
