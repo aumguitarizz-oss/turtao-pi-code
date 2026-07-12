@@ -13,6 +13,15 @@ def inject_deps(**kwargs) -> None:
     _deps.update(kwargs)
 
 
+def _enrollment_status(enroll) -> dict:
+    return {
+        "active": enroll.active,
+        "pose_index": enroll.pose_index,
+        "poses_total": enroll.poses_total,
+        "quality_issue": enroll.quality_issue,
+    }
+
+
 @faces_bp.route("/api/faces")
 def list_faces():
     engine = _deps.get("face_engine")
@@ -73,12 +82,7 @@ def enroll_status():
     enroll = _deps.get("enrollment")
     if enroll is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
-    return {
-        "active": enroll.active,
-        "pose_index": enroll.pose_index,
-        "poses_total": enroll.poses_total,
-        "quality_issue": enroll.quality_issue,
-    }
+    return _enrollment_status(enroll)
 
 
 @faces_bp.route("/api/faces/enroll/start", methods=["POST"])
@@ -107,12 +111,7 @@ def enroll_start():
     except Exception as exc:
         raise APIError(str(exc), "ENROLL_FAILURE", 500) from exc
 
-    return {
-        "active": enroll.active,
-        "pose_index": enroll.pose_index,
-        "poses_total": enroll.poses_total,
-        "quality_issue": enroll.quality_issue,
-    }
+    return _enrollment_status(enroll)
 
 
 @faces_bp.route("/api/faces/enroll/capture", methods=["POST"])
@@ -129,12 +128,7 @@ def enroll_capture():
     except Exception as exc:
         raise APIError(str(exc), "CAPTURE_FAILURE", 500) from exc
 
-    return {
-        "active": enroll.active,
-        "pose_index": enroll.pose_index,
-        "poses_total": enroll.poses_total,
-        "quality_issue": enroll.quality_issue,
-    }
+    return _enrollment_status(enroll)
 
 
 @faces_bp.route("/api/faces/enroll/cancel", methods=["POST"])
@@ -148,12 +142,7 @@ def enroll_cancel():
     except Exception as exc:
         raise APIError(str(exc), "CANCEL_FAILURE", 500) from exc
 
-    return {
-        "active": enroll.active,
-        "pose_index": enroll.pose_index,
-        "poses_total": enroll.poses_total,
-        "quality_issue": enroll.quality_issue,
-    }
+    return _enrollment_status(enroll)
 
 
 @faces_bp.route("/api/faces/promote", methods=["POST"])

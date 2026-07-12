@@ -26,25 +26,28 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     from turtao.api.errors import register_error_handlers
     register_error_handlers(app)
 
-    from turtao.api.routes_camera import camera_bp
-    from turtao.api.routes_alert import alert_bp
-    from turtao.api.routes_environment import environment_bp
-    from turtao.api.routes_mode import mode_bp
-    from turtao.api.routes_control import control_bp
-    from turtao.api.routes_faces import faces_bp
-    from turtao.api.routes_settings import settings_bp
-    from turtao.api.routes_ble import ble_bp
-    from turtao.api.routes_misc import misc_bp
+    from turtao.api import routes_camera, routes_alert, routes_environment, routes_mode
+    from turtao.api import routes_control, routes_faces, routes_settings, routes_ble, routes_misc
 
-    camera_bp.inject_deps(camera=camera)
-    alert_bp.inject_deps(state=state)
-    environment_bp.inject_deps(state=state)
-    mode_bp.inject_deps(state=state, serial=serial_link)
-    control_bp.inject_deps(state=state, serial=serial_link, settings=settings)
-    faces_bp.inject_deps(face_engine=face_engine, enrollment=enrollment, config=config)
-    settings_bp.inject_deps(settings=settings, tts=tts)
-    ble_bp.inject_deps(bt_manager=bt_manager, settings=settings, serial=serial_link)
-    misc_bp.inject_deps(state=state, serial=serial_link, settings=settings)
+    camera_bp = routes_camera.camera_bp
+    alert_bp = routes_alert.alert_bp
+    environment_bp = routes_environment.environment_bp
+    mode_bp = routes_mode.mode_bp
+    control_bp = routes_control.control_bp
+    faces_bp = routes_faces.faces_bp
+    settings_bp = routes_settings.settings_bp
+    ble_bp = routes_ble.ble_bp
+    misc_bp = routes_misc.misc_bp
+
+    routes_camera.inject_deps(camera=camera)
+    routes_alert.inject_deps(state=state)
+    routes_environment.inject_deps(state=state)
+    routes_mode.inject_deps(state=state, serial=serial_link)
+    routes_control.inject_deps(state=state, serial=serial_link, settings=settings)
+    routes_faces.inject_deps(face_engine=face_engine, enrollment=enrollment, config=config)
+    routes_settings.inject_deps(settings=settings, tts=tts)
+    routes_ble.inject_deps(bt_manager=bt_manager, settings=settings, serial=serial_link)
+    routes_misc.inject_deps(state=state, serial=serial_link, settings=settings)
 
     app.register_blueprint(camera_bp)
     app.register_blueprint(alert_bp)

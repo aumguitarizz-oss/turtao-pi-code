@@ -107,3 +107,36 @@ class TestStatusWebSocket:
             with client.websocket("/ws/status") as ws:
                 assert ws is not None
                 ws.send("ping")
+
+
+class TestHandleStatusClient:
+    def test_registered_client_receives_broadcast(self):
+        from turtao.state import AppState
+
+        state = AppState()
+        broadcaster = StatusBroadcaster(state)
+        ws = MagicMock()
+
+        broadcaster.add_client(ws)
+        broadcaster.broadcast()
+
+        assert ws.send.called
+        sent = json.loads(ws.send.call_args[0][0])
+        assert sent["event"] == "status"
+
+    def test_client_stays_connected_past_receive_timeout(self):
+        from turtao.state import AppState
+        from turtao.api.ws_status import handle_status_client
+
+        state = AppState()
+        broadcaster = StatusBroadcaster(state)
+        ws = MagicMock()
+        # First few calls simulate flask-sock's receive() timing out (returns
+        # None) since the client never sends anything; the last call
+        # simulates the client actually disconnecting.
+        ws.receive.side_effect = [None, None, None, Exception("closed")]
+
+        handle_status_client(ws, broadcaster)
+
+        assert ws.receive.call_count == 4
+        assert ws not in broadcaster._clients
