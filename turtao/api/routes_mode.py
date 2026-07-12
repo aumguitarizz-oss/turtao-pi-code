@@ -1,6 +1,7 @@
 import logging
 from flask import Blueprint, request
 from turtao.api.errors import APIError
+from turtao.state import Mode
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ def mode():
         )
 
     try:
-        setattr(st, "mode", new_mode)
+        setattr(st, "mode", Mode(new_mode))
     except Exception as exc:
         raise APIError(str(exc), "MODE_FAILURE", 500) from exc
 

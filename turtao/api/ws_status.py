@@ -4,6 +4,8 @@ import time
 import logging
 from flask_sock import Sock
 
+from turtao.state import Mode
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,7 +53,7 @@ class StatusBroadcaster:
                     "confidence": ts.confidence,
                     "timestamp": ts.timestamp,
                 },
-                "mode": st.mode.value if hasattr(st.mode, "value") else st.mode,
+                "mode": st.mode.value if isinstance(st.mode, Mode) else st.mode,
                 "battery": {
                     "percent": int(b.percent),
                     "voltage": b.voltage,
@@ -69,26 +71,54 @@ class StatusBroadcaster:
         }
 
 
+_broadcaster: StatusBroadcaster | None = None
+_broadcaster_lock = threading.Lock()
+
+
+def get_broadcaster(state) -> StatusBroadcaster:
+    """Return the process-wide StatusBroadcaster, creating it on first use.
+
+    Shared between register_status_ws() and ws_broadcast_loop() so that
+    clients registered on one are actually reached by broadcasts from the
+    other, regardless of which is set up first.
+    """
+    global _broadcaster
+    with _broadcaster_lock:
+        if _broadcaster is None:
+            _broadcaster = StatusBroadcaster(state)
+        return _broadcaster
+
+
+def handle_status_client(ws, broadcaster: StatusBroadcaster) -> None:
+    """Run the receive loop for one connected /ws/status client.
+
+    The client never sends anything, so a receive timeout is expected and
+    must not be treated as a disconnect -- only an actual exception from
+    receive() (e.g. ConnectionClosed) ends the loop.
+    """
+    broadcaster.add_client(ws)
+    try:
+        while True:
+            try:
+                ws.receive(timeout=2)
+            except Exception:
+                break
+    finally:
+        broadcaster.remove_client(ws)
+
+
 def register_status_ws(sock: Sock, state) -> None:
-    broadcaster = StatusBroadcaster(state)
+    broadcaster = get_broadcaster(state)
 
     @sock.route("/ws/status")
     def status_ws(ws):
-        broadcaster.add_client(ws)
-        try:
-            while True:
-                msg = ws.receive(timeout=2)
-                if msg is None:
-                    break
-        except Exception:
-            pass
-        finally:
-            broadcaster.remove_client(ws)
+        handle_status_client(ws, broadcaster)
 
 
 def ws_broadcast_loop(state) -> None:
+    broadcaster = get_broadcaster(state)
+
     def _loop():
-        broadcaster = StatusBroadcaster(state)
         while True:
             try:
                 broadcaster.broadcast()

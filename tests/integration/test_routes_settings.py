@@ -44,6 +44,26 @@ class TestSettingsRoutes:
         assert data["tts_event_toggles"]["low_battery"] is False
         assert data["tts_event_toggles"]["intruder"] is True
 
+    def test_post_full_settings_object_with_nested_dicts(self, client, mock_settings):
+        body = mock_settings.asdict()
+        body["hostname"] = "fullbot"
+        body["speed"] = 0.4
+        body["tts_event_toggles"] = {"threat": False, "low_battery": True, "intruder": False}
+        body["notifications"] = {
+            "threat": False,
+            "gas_danger": False,
+            "low_battery": True,
+            "tamper": True,
+            "connection_lost": False,
+        }
+        resp = client.post("/api/settings", json=body)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["hostname"] == "fullbot"
+        assert data["speed"] == 0.4
+        assert data["tts_event_toggles"] == body["tts_event_toggles"]
+        assert data["notifications"] == body["notifications"]
+
     def test_post_invalid_field_returns_validation_error(self, client):
         resp = client.post("/api/settings", json={"nonexistent_field": 42})
         assert resp.status_code == 400

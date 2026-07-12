@@ -54,6 +54,12 @@ class Settings(BaseModel):
                     data[key] = value
         return Settings.model_validate(data)
 
+    def asdict(self) -> dict[str, Any]:
+        return self.model_dump()
+
+    def save(self) -> None:
+        save_settings(self)
+
 
 class AppConfig(BaseModel):
     flask_port: int = Field(default=5000, ge=1024, le=65535)

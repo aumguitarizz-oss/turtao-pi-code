@@ -47,7 +47,7 @@ def main():
         )
         flask_thread = threading.Thread(
             target=lambda: app.run(
-                host="0.0.0.0", port=config.flask_port, debug=False, use_reloader=False
+                host="0.0.0.0", port=config.flask_port, debug=False, use_reloader=False, threaded=True
             ),
             daemon=True,
             name="flask",
@@ -67,7 +67,7 @@ def main():
             core.bt_manager, core.tracker, core.antispoof,
         )
         app.run(
-            host="0.0.0.0", port=config.flask_port, debug=False, use_reloader=False,
+            host="0.0.0.0", port=config.flask_port, debug=False, use_reloader=False, threaded=True,
         )
 
 

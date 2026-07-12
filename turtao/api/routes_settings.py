@@ -28,14 +28,19 @@ def settings():
     if not body:
         raise APIError("Request body required", "VALIDATION_ERROR", 400)
 
-    known = s.asdict().keys()
+    known = s.asdict()
     for key, value in body.items():
         if key not in known:
             raise APIError(f"Unknown setting '{key}'", "VALIDATION_ERROR", 400)
-        if not isinstance(value, SCALAR_TYPES) and value is not None:
+        current = known[key]
+        if isinstance(current, dict):
+            if not isinstance(value, dict):
+                raise APIError(f"Invalid type for '{key}'", "VALIDATION_ERROR", 400)
+        elif not isinstance(value, SCALAR_TYPES) and value is not None:
             raise APIError(f"Invalid type for '{key}'", "VALIDATION_ERROR", 400)
 
-    for key, value in body.items():
+    merged = s.shallow_merge(body)
+    for key, value in vars(merged).items():
         setattr(s, key, value)
 
     try:

@@ -2,6 +2,7 @@ import json
 import logging
 from flask import Blueprint, request
 from turtao.api.errors import APIError
+from turtao.state import Mode
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def control():
                 logger.exception("Failed to persist speed setting")
         if speed == 0 and safe_mode is True:
             if st is not None:
-                st.mode = "IDLE"
+                st.mode = Mode.IDLE
             if ser is not None:
                 try:
                     ser.write(json.dumps({"cmd": "estop"}) + "\n")
@@ -63,8 +64,10 @@ def control():
             logger.exception("Failed to persist safe_mode setting")
 
     if pan is not None or tilt is not None:
-        cmd_pan = max(PAN_MIN, min(PAN_MAX, int(pan))) if pan is not None else None
-        cmd_tilt = max(TILT_MIN, min(TILT_MAX, int(tilt))) if tilt is not None else None
+        # The API is 0-centered degrees (-90..+90); servo space is 90-centered
+        # (PAN_MIN..PAN_MAX / TILT_MIN..TILT_MAX), so shift by +90 before clamping.
+        cmd_pan = max(PAN_MIN, min(PAN_MAX, int(pan) + 90)) if pan is not None else None
+        cmd_tilt = max(TILT_MIN, min(TILT_MAX, int(tilt) + 90)) if tilt is not None else None
         payload: dict = {"cmd": "pan_tilt"}
         if cmd_pan is not None:
             payload["pan"] = cmd_pan

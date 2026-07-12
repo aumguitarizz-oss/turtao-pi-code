@@ -1,3 +1,4 @@
+import copy
 import pytest
 from unittest.mock import MagicMock
 from flask import Flask
@@ -84,6 +85,16 @@ class MockSettings:
 
     def save(self):
         pass
+
+    def shallow_merge(self, partial):
+        new = copy.deepcopy(self)
+        for key, value in partial.items():
+            current = getattr(new, key, None)
+            if isinstance(current, dict) and isinstance(value, dict):
+                current.update(value)
+            else:
+                setattr(new, key, value)
+        return new
 
 
 class MockEnrollment:

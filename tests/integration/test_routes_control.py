@@ -1,7 +1,23 @@
+import json
 import pytest
 
 
 class TestControlRoute:
+    def test_pan_tilt_zero_centers_maps_to_servo_ninety(self, client, mock_serial):
+        mock_serial.open()
+        resp = client.post("/api/control", json={"pan": 0, "tilt": 0})
+        assert resp.status_code == 200
+        payload = json.loads(mock_serial.written[-1])
+        assert payload["pan"] == 90
+        assert payload["tilt"] == 90
+
+    def test_pan_tilt_clamped_to_servo_range(self, client, mock_serial):
+        mock_serial.open()
+        client.post("/api/control", json={"pan": -90, "tilt": 90})
+        payload = json.loads(mock_serial.written[-1])
+        assert payload["pan"] == 5
+        assert payload["tilt"] == 120
+
     def test_post_control_sends_commands(self, client, mock_serial):
         mock_serial.open()
         resp = client.post("/api/control", json={"speed": 0.5, "safe_mode": True})
