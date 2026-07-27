@@ -45,3 +45,12 @@ class TestBLERoutes:
     def test_register_no_body_returns_error(self, client):
         resp = client.post("/api/ble/register", json=None)
         assert resp.status_code == 400
+
+    def test_devices_come_from_sensor_data_not_top_level_state(self, client, mock_state):
+        mock_state.sensor_data.ble_devices = [
+            {"id": "devX", "name": "Test Phone", "rssi": -50, "owner": False},
+        ]
+        resp = client.get("/api/ble/devices")
+        data = resp.get_json()
+        assert len(data) == 1
+        assert data[0]["id"] == "devX"

@@ -22,7 +22,7 @@ def ble_devices():
     if st is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
 
-    devices = getattr(st, "ble_devices", [])
+    devices = getattr(st.sensor_data, "ble_devices", [])
     return [
         {
             "id": d.get("id", ""),
