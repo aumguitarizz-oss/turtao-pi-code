@@ -1,6 +1,5 @@
 import logging
 import tempfile
-from pathlib import Path
 
 from flask import Blueprint, request
 
@@ -38,7 +37,5 @@ def play_audio():
         tts.play_file(tmp_path)
     except Exception as exc:
         raise APIError(str(exc), "PLAYBACK_FAILURE", 500) from exc
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
 
     return {"ok": True}
