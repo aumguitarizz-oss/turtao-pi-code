@@ -1,3 +1,4 @@
+import io
 import logging
 
 from flask import Blueprint, request, send_file
@@ -65,7 +66,7 @@ def face_thumb(name: str):
     jpeg = engine.get_thumb(name)
     if jpeg is None:
         raise APIError("Face not found", "NOT_FOUND", 404)
-    return send_file(jpeg, mimetype="image/jpeg")
+    return send_file(io.BytesIO(jpeg), mimetype="image/jpeg")
 
 
 @faces_bp.route("/api/faces/unknowns/<id>/thumb")
@@ -76,7 +77,7 @@ def unknown_thumb(id: str):
     jpeg = engine.get_unknown_thumb(id)
     if jpeg is None:
         raise APIError("Unknown face not found", "NOT_FOUND", 404)
-    return send_file(jpeg, mimetype="image/jpeg")
+    return send_file(io.BytesIO(jpeg), mimetype="image/jpeg")
 
 
 @faces_bp.route("/api/faces/enroll/status")

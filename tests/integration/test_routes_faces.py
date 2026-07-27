@@ -131,3 +131,9 @@ class TestFacesRoutes:
         data = resp.get_json()
         assert len(data) == 1
         assert data[0]["id"] == "unk1"
+
+    def test_face_thumb_returns_actual_jpeg_bytes(self, client, mock_face_engine):
+        mock_face_engine._faces["alice"] = 5
+        resp = client.get("/api/faces/alice/thumb")
+        assert resp.status_code == 200
+        assert resp.data == b"fake_jpeg"

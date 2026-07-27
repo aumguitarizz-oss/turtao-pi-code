@@ -1,3 +1,4 @@
+import io
 import logging
 
 from flask import Blueprint, Response, send_file
@@ -29,4 +30,4 @@ def snapshot():
     jpeg_bytes = cam.get_latest_frame()
     if jpeg_bytes is None:
         return {"error": "NO_FRAME", "detail": "No frame available"}, 503
-    return send_file(jpeg_bytes, mimetype="image/jpeg")
+    return send_file(io.BytesIO(jpeg_bytes), mimetype="image/jpeg")
