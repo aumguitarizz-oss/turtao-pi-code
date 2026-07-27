@@ -1,6 +1,16 @@
 import pytest
 
 
+@pytest.fixture
+def tiny_jpeg_bytes():
+    import cv2
+    import numpy as np
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    ok, buf = cv2.imencode(".jpg", frame)
+    assert ok
+    return buf.tobytes()
+
+
 class TestFacesRoutes:
     def test_list_faces_empty(self, client):
         resp = client.get("/api/faces")
@@ -83,6 +93,7 @@ class TestFacesRoutes:
         assert resp.status_code == 200
         assert resp.get_json() == {
             "active": False, "pose_index": 0, "poses_total": 5, "quality_issue": None,
+            "processing": False,
         }
         assert mock_enrollment.get_status()["status"] == "idle"
 
@@ -91,6 +102,7 @@ class TestFacesRoutes:
         assert resp.status_code == 200
         assert resp.get_json() == {
             "active": False, "pose_index": 0, "poses_total": 5, "quality_issue": None,
+            "processing": False,
         }
 
     def test_enroll_status_idle(self, client):
@@ -147,3 +159,51 @@ class TestFacesRoutes:
         resp = client.get("/api/faces/alice/thumb")
         assert resp.status_code == 200
         assert resp.data == b"fake_jpeg"
+
+    def test_capture_upload_returns_202(self, client, mock_enrollment, tiny_jpeg_bytes):
+        import io
+        client.post("/api/faces/enroll/start", json={"name": "frank"})
+        data = {"frames": [(io.BytesIO(tiny_jpeg_bytes), f"frame{i}.jpg") for i in range(5)]}
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 202
+        assert resp.get_json() == {"ok": True}
+
+    def test_capture_upload_no_frames_returns_400(self, client, mock_enrollment):
+        client.post("/api/faces/enroll/start", json={"name": "grace"})
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data={}, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 400
+
+    def test_capture_upload_too_many_frames_returns_400(self, client, mock_enrollment):
+        import io
+        client.post("/api/faces/enroll/start", json={"name": "henry"})
+        data = {"frames": [(io.BytesIO(b"fake"), f"frame{i}.jpg") for i in range(11)]}
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 400
+
+    def test_capture_upload_without_active_enrollment_returns_409(self, client):
+        import io
+        data = {"frames": [(io.BytesIO(b"fake"), "frame0.jpg")]}
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 409
+
+    def test_enroll_status_includes_processing_field(self, client):
+        resp = client.get("/api/faces/enroll/status")
+        assert "processing" in resp.get_json()
+
+    def test_capture_upload_while_already_processing_returns_409(self, client, mock_enrollment, tiny_jpeg_bytes):
+        import io
+        client.post("/api/faces/enroll/start", json={"name": "iris"})
+        mock_enrollment._processing_override = True
+        data = {"frames": [(io.BytesIO(tiny_jpeg_bytes), "frame0.jpg")]}
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 409

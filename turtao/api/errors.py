@@ -17,12 +17,18 @@ def error_response(message: str, code: str = "UNKNOWN_ERROR", status: int = 400)
 
 
 def register_error_handlers(app) -> None:
+    from werkzeug.exceptions import RequestEntityTooLarge
+
     from turtao.api.errors import APIError
 
     @app.errorhandler(APIError)
     def handle_api_error(e):
         logger.warning("APIError: %s (%s)", e.message, e.code)
         return error_response(e.message, e.code, e.status)
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def request_too_large(e):
+        return error_response("Upload exceeds the 12 MB limit", "PAYLOAD_TOO_LARGE", 413)
 
     @app.errorhandler(404)
     def not_found(e):

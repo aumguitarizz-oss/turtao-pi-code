@@ -101,6 +101,19 @@ class MockEnrollment:
         self._poses_total = 5
         self._quality_issue = ""
         self._fail_next_capture = False
+        self._processing_override = False
+
+    def capture_pose_burst(self, frames):
+        return self.capture_pose(lambda: frames[0] if frames else None)
+
+    @property
+    def is_processing(self):
+        return self._processing_override
+
+    def start_capture_burst(self, frames, on_complete=None):
+        result = self.capture_pose_burst(frames)
+        if result.get("status") == "complete" and on_complete is not None:
+            on_complete()
 
     def start_enrollment(self, name):
         self._active_name = name

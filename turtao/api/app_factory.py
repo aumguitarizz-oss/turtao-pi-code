@@ -23,6 +23,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     app.config["BT_MANAGER"] = bt_manager
     app.config["TRACKER"] = tracker
     app.config["ANTISPOOF"] = antispoof
+    app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
     from turtao.api.errors import register_error_handlers
     register_error_handlers(app)

@@ -1,6 +1,8 @@
 import io
 import logging
 
+import cv2
+import numpy as np
 from flask import Blueprint, request, send_file
 
 from turtao.api.errors import APIError
@@ -24,6 +26,7 @@ def _enrollment_status(enroll) -> dict:
         "pose_index": (s.get("pose", 1) - 1) if active else 0,
         "poses_total": s.get("total_poses", 5),
         "quality_issue": s.get("quality_issue") or None,
+        "processing": enroll.is_processing,
     }
 
 
@@ -144,6 +147,46 @@ def enroll_capture():
         if engine is not None:
             engine.load_embeddings(str(engine._embeddings_dir))
     return status
+
+
+MAX_UPLOAD_FRAMES = 10
+
+
+@faces_bp.route("/api/faces/enroll/capture_upload", methods=["POST"])
+def enroll_capture_upload():
+    enroll = _deps.get("enrollment")
+    if enroll is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
+
+    if enroll.get_status().get("status") != "active":
+        raise APIError("No active enrollment", "NO_ENROLLMENT", 409)
+
+    if enroll.is_processing:
+        raise APIError("Capture already in progress", "CAPTURE_IN_PROGRESS", 409)
+
+    files = request.files.getlist("frames")
+    if not files:
+        raise APIError("frames field required", "VALIDATION_ERROR", 400)
+    if len(files) > MAX_UPLOAD_FRAMES:
+        raise APIError(f"Too many frames (max {MAX_UPLOAD_FRAMES})", "VALIDATION_ERROR", 400)
+
+    decoded = []
+    for f in files:
+        data = f.read()
+        arr = np.frombuffer(data, dtype=np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise APIError("Undecodable frame in upload", "VALIDATION_ERROR", 400)
+        decoded.append(frame)
+
+    engine = _deps.get("face_engine")
+
+    def _reload_on_complete() -> None:
+        if engine is not None:
+            engine.load_embeddings(str(engine._embeddings_dir))
+
+    enroll.start_capture_burst(decoded, on_complete=_reload_on_complete)
+    return {"ok": True}, 202
 
 
 @faces_bp.route("/api/faces/enroll/cancel", methods=["POST"])
