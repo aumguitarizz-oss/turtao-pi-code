@@ -8,6 +8,7 @@ from turtao.vision.face_recognition_engine import FaceRecognitionEngine
 from turtao.vision.enrollment import EnrollmentManager
 from turtao.vision.camera import Camera
 from turtao.hardware.interfaces import CameraInterface
+from turtao.audio.tts import TTSManager
 
 
 REQUIRED_FACE_ENGINE_METHODS = [
@@ -21,6 +22,8 @@ REQUIRED_ENROLLMENT_METHODS = [
 ]
 
 REQUIRED_CAMERA_METHODS = ["read", "release", "get_latest_frame"]
+
+REQUIRED_TTS_METHODS = ["speak", "play_file"]
 
 
 class TestFaceRecognitionEngineInterface:
@@ -51,3 +54,11 @@ class TestCameraInterface:
 
     def test_camera_interface_declares_get_latest_frame(self):
         assert hasattr(CameraInterface, "get_latest_frame")
+
+
+class TestTTSManagerInterface:
+    def test_has_all_methods_routes_call(self):
+        for method in REQUIRED_TTS_METHODS:
+            assert hasattr(TTSManager, method), (
+                f"TTSManager is missing '{method}', which turtao/api/routes_audio.py calls"
+            )

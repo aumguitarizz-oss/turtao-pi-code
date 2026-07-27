@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -71,6 +72,7 @@ class FaceRecognitionEngine:
     def __init__(self, state: AppState, tolerance: float = 0.6) -> None:
         self._state = state
         self._tolerance = tolerance
+        self._embeddings_dir: Path = Path(".")
         self._known_embeddings: list[np.ndarray] = []
         self._known_names: list[str] = []
         self._unknown_embeddings: list[np.ndarray] = []
@@ -133,7 +135,36 @@ class FaceRecognitionEngine:
             raise ValueError(f"Face '{name}' not found")
         for m in matches:
             m.unlink()
+        self._remove_profile(name)
         self.load_embeddings(str(self._embeddings_dir))
+
+    def _profiles_path(self) -> Path:
+        return self._embeddings_dir.parent / "profiles.json"
+
+    def _read_profiles(self) -> list[dict]:
+        path = self._profiles_path()
+        if not path.is_file():
+            return []
+        try:
+            return json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return []
+
+    def _write_profiles(self, profiles: list[dict]) -> None:
+        self._profiles_path().write_text(json.dumps(profiles, indent=2))
+
+    def _upsert_profile(self, name: str, embeddings: list[str]) -> None:
+        profiles = [p for p in self._read_profiles() if p.get("name") != name]
+        profiles.append({
+            "name": name,
+            "embeddings": embeddings,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        })
+        self._write_profiles(profiles)
+
+    def _remove_profile(self, name: str) -> None:
+        profiles = [p for p in self._read_profiles() if p.get("name") != name]
+        self._write_profiles(profiles)
 
     def _unknowns_dir(self) -> Path:
         return self._embeddings_dir.parent / "unknowns"
@@ -167,12 +198,16 @@ class FaceRecognitionEngine:
         src = self._unknowns_dir() / f"{face_id}.jpg"
         if not src.is_file():
             raise ValueError(f"Unknown '{face_id}' not found")
+        if self.face_exists(name):
+            raise ValueError(f"Face '{name}' already exists")
         frame = cv2.imread(str(src))
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         encodings = face_recognition.face_encodings(rgb)
-        if encodings:
-            np.save(str(self._embeddings_dir / f"{name}_000.npy"), encodings[0])
+        if not encodings:
+            raise ValueError("No face detected in unknown crop")
+        np.save(str(self._embeddings_dir / f"{name}_000.npy"), encodings[0])
         src.unlink()
+        self._upsert_profile(name, [f"{name}_000.npy"])
         self.load_embeddings(str(self._embeddings_dir))
 
     def process_frame(self, frame: np.ndarray) -> None:

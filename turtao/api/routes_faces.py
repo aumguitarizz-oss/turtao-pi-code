@@ -138,7 +138,12 @@ def enroll_capture():
     except Exception as exc:
         raise APIError(str(exc), "CAPTURE_FAILURE", 500) from exc
 
-    return _enrollment_status(enroll)
+    status = _enrollment_status(enroll)
+    if not status["active"]:
+        engine = _deps.get("face_engine")
+        if engine is not None:
+            engine.load_embeddings(str(engine._embeddings_dir))
+    return status
 
 
 @faces_bp.route("/api/faces/enroll/cancel", methods=["POST"])

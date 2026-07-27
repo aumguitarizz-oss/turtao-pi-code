@@ -143,6 +143,11 @@ class MockFaceEngine:
     def __init__(self):
         self._faces = {}
         self._unknowns = {}
+        self._embeddings_dir = "face_data/embeddings"
+        self.load_embeddings_call_count = 0
+
+    def load_embeddings(self, profile_dir):
+        self.load_embeddings_call_count += 1
 
     def list_faces(self):
         from types import SimpleNamespace
@@ -195,6 +200,9 @@ class MockBTManager:
 
 class MockTTS:
     def speak(self, text):
+        pass
+
+    def play_file(self, path):
         pass
 
 

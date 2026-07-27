@@ -61,6 +61,16 @@ class TestFacesRoutes:
         resp = client.get("/api/faces/enroll/status")
         assert resp.get_json()["active"] is False
 
+    def test_enroll_capture_completion_reloads_face_engine(
+        self, client, mock_enrollment, mock_face_engine
+    ):
+        client.post("/api/faces/enroll/start", json={"name": "charlie"})
+        for _ in range(4):
+            client.post("/api/faces/enroll/capture")
+        assert mock_face_engine.load_embeddings_call_count == 0
+        client.post("/api/faces/enroll/capture")
+        assert mock_face_engine.load_embeddings_call_count == 1
+
     def test_enroll_capture_without_start_returns_error(self, client):
         resp = client.post("/api/faces/enroll/capture")
         assert resp.status_code == 409

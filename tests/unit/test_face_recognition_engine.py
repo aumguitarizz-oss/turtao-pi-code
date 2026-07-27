@@ -195,6 +195,13 @@ class TestDeleteFace:
         assert engine.face_exists("bob") is False
         assert engine.face_exists("bob_smith") is True
 
+    def test_removes_profile_entry(self, engine):
+        _write_embedding(engine, "frank", 0)
+        engine._write_profiles([{"name": "frank", "embeddings": ["frank_000.npy"], "created_at": "2026-01-01T00:00:00"}])
+        engine.delete_face("frank")
+        profiles = engine._read_profiles()
+        assert all(p.get("name") != "frank" for p in profiles)
+
 
 class TestUnknowns:
     def test_list_unknowns_empty(self, engine):
@@ -246,3 +253,38 @@ class TestUnknowns:
     def test_promote_unknown_raises_when_absent(self, engine):
         with pytest.raises(ValueError):
             engine.promote_unknown("nope", "erin")
+
+    def test_promote_unknown_raises_when_no_face_detected(self, engine):
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        with patch("turtao.vision.face_recognition_engine.cv2") as mock_cv2, \
+             patch("turtao.vision.face_recognition_engine.face_recognition") as mock_fr:
+            mock_cv2.imread.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+            mock_cv2.cvtColor.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+            mock_fr.face_encodings.return_value = []
+            with pytest.raises(ValueError):
+                engine.promote_unknown("unknown_20260101_120000", "erin")
+        # Crop must survive the failed attempt — not silently deleted.
+        assert (unknown_dir / "unknown_20260101_120000.jpg").is_file()
+
+    def test_promote_unknown_raises_when_name_already_exists(self, engine):
+        _write_embedding(engine, "erin", 0)
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        with pytest.raises(ValueError):
+            engine.promote_unknown("unknown_20260101_120000", "erin")
+
+    def test_promote_unknown_writes_profile_entry(self, engine):
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        with patch("turtao.vision.face_recognition_engine.cv2") as mock_cv2, \
+             patch("turtao.vision.face_recognition_engine.face_recognition") as mock_fr:
+            mock_cv2.imread.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+            mock_cv2.cvtColor.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+            mock_fr.face_encodings.return_value = [np.zeros(128)]
+            engine.promote_unknown("unknown_20260101_120000", "grace")
+        profiles = engine._read_profiles()
+        assert any(p.get("name") == "grace" for p in profiles)

@@ -38,3 +38,12 @@ class TestAudioRoutes:
         assert os.path.exists(tmp_path)
 
         os.unlink(tmp_path)
+
+    def test_play_audio_with_default_mock_tts(self, client):
+        """Uses the default `mock_tts` fixture (no MagicMock override) to
+        prove the route works against the actual MockTTS test double, which
+        must implement play_file (see turtao/audio/tts.py TTSManager).
+        """
+        data = {"audio": (io.BytesIO(b"fake m4a bytes"), "clip.m4a")}
+        resp = client.post("/api/audio/play", data=data, content_type="multipart/form-data")
+        assert resp.status_code == 200
