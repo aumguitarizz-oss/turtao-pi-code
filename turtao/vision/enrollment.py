@@ -372,8 +372,9 @@ class EnrollmentManager:
     def start_capture_burst(
         self, frames: list[np.ndarray], on_complete: Any = None
     ) -> None:
+        self._processing = True
+
         def _run() -> None:
-            self._processing = True
             try:
                 result = self.capture_pose_burst(frames)
                 if result.get("status") == "complete" and on_complete is not None:
