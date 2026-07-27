@@ -29,6 +29,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
 
     from turtao.api import (
         routes_alert,
+        routes_audio,
         routes_ble,
         routes_camera,
         routes_control,
@@ -39,6 +40,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
         routes_settings,
     )
 
+    audio_bp = routes_audio.audio_bp
     camera_bp = routes_camera.camera_bp
     alert_bp = routes_alert.alert_bp
     environment_bp = routes_environment.environment_bp
@@ -58,7 +60,9 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     routes_settings.inject_deps(settings=settings, tts=tts)
     routes_ble.inject_deps(state=state, settings=settings, serial=serial_link)
     routes_misc.inject_deps(state=state, serial=serial_link, settings=settings)
+    routes_audio.inject_deps(tts=tts)
 
+    app.register_blueprint(audio_bp)
     app.register_blueprint(camera_bp)
     app.register_blueprint(alert_bp)
     app.register_blueprint(environment_bp)

@@ -34,6 +34,22 @@ class TTSManager:
             daemon=True,
         ).start()
 
+    def play_file(self, path: str) -> None:
+        threading.Thread(
+            target=self._execute_play_file,
+            args=(path,),
+            daemon=True,
+        ).start()
+
+    def _execute_play_file(self, path: str) -> None:
+        try:
+            subprocess.Popen(
+                ["aplay", path],
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as e:
+            logger.error("Audio playback subprocess error: %s", e)
+
     def _execute_tts(self, text: str) -> None:
         piper_bin = self._piper_dir / "piper"
         model_path = self._piper_dir / self._model_name

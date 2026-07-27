@@ -213,6 +213,7 @@ def mock_tts():
 @pytest.fixture(autouse=True)
 def _clear_route_deps():
     import turtao.api.routes_alert
+    import turtao.api.routes_audio
     import turtao.api.routes_camera
     import turtao.api.routes_control
     import turtao.api.routes_environment
@@ -224,6 +225,7 @@ def _clear_route_deps():
 
     for mod in [
         turtao.api.routes_alert,
+        turtao.api.routes_audio,
         turtao.api.routes_camera,
         turtao.api.routes_control,
         turtao.api.routes_environment,
@@ -245,6 +247,7 @@ def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engin
     app.config["TESTING"] = True
 
     from turtao.api.routes_alert import alert_bp, inject_deps as inject_alert
+    from turtao.api.routes_audio import audio_bp, inject_deps as inject_audio
     from turtao.api.routes_camera import camera_bp, inject_deps as inject_camera
     from turtao.api.routes_control import control_bp, inject_deps as inject_control
     from turtao.api.routes_environment import environment_bp, inject_deps as inject_env
@@ -255,6 +258,7 @@ def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engin
     from turtao.api.routes_misc import misc_bp, inject_deps as inject_misc
 
     inject_alert(state=mock_state)
+    inject_audio(tts=mock_tts)
     inject_camera(camera=MagicMock())
     inject_control(state=mock_state, serial=mock_serial, settings=mock_settings)
     inject_env(state=mock_state)
@@ -265,6 +269,7 @@ def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engin
     inject_misc(state=mock_state, serial=mock_serial, settings=mock_settings)
 
     app.register_blueprint(alert_bp)
+    app.register_blueprint(audio_bp)
     app.register_blueprint(camera_bp)
     app.register_blueprint(control_bp)
     app.register_blueprint(environment_bp)
