@@ -48,6 +48,8 @@ class TTSManager:
                 stderr=subprocess.DEVNULL,
             )
             proc.wait()
+            if proc.returncode != 0:
+                logger.warning("aplay exited with code %d playing %s", proc.returncode, path)
         except OSError as e:
             logger.error("Audio playback subprocess error: %s", e)
         finally:
