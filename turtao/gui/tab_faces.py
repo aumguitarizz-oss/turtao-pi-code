@@ -1,10 +1,10 @@
-import tkinter as tk
-from tkinter import ttk
-from pathlib import Path
 import json
-from PIL import Image, ImageTk
-import cv2
+import tkinter as tk
+from pathlib import Path
+from tkinter import ttk
+
 import numpy as np
+from PIL import Image, ImageTk
 
 
 class FacesTab:
@@ -31,16 +31,29 @@ class FacesTab:
         self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self._thumbnails: list[ImageTk.PhotoImage] = []
+        self._last_profiles_mtime: float = -1.0
 
     def refresh(self) -> None:
+        profiles_path = Path("face_data/profiles.json")
+        embeddings_dir = Path("face_data/embeddings")
+
+        mtime = 0.0
+        if profiles_path.exists():
+            try:
+                mtime = profiles_path.stat().st_mtime
+            except OSError:
+                pass
+
+        if mtime == self._last_profiles_mtime:
+            return
+
+        self._last_profiles_mtime = mtime
+
         for w in self._scrollable.winfo_children():
             w.destroy()
         self._thumbnails.clear()
 
-        profiles_path = Path("face_data/profiles.json")
-        embeddings_dir = Path("face_data/embeddings")
-
-        if not profiles_path.exists():
+        if mtime == 0.0:
             ttk.Label(self._scrollable, text="No enrolled faces", foreground="gray").pack(
                 pady=20
             )
@@ -82,10 +95,11 @@ class FacesTab:
                 inner, text=f"{len(info)} pose(s)"
             ).pack(side=tk.LEFT, padx=10)
 
+            name = profile.get("name", "")
             delete_btn = ttk.Button(
                 inner,
                 text="Delete",
-                command=lambda n=profile.get("name", ""): self._delete_face(n),
+                command=lambda n=name: self._delete_face(n),
             )
             delete_btn.pack(side=tk.RIGHT)
 

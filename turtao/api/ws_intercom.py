@@ -1,4 +1,5 @@
 import logging
+
 from flask_sock import Sock
 
 logger = logging.getLogger(__name__)

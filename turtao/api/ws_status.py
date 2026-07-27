@@ -1,7 +1,8 @@
 import json
+import logging
 import threading
 import time
-import logging
+
 from flask_sock import Sock
 
 from turtao.state import Mode

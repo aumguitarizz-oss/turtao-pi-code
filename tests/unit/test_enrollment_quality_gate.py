@@ -9,8 +9,10 @@ class TestCheckQuality:
     def manager(self, tmp_path):
         return EnrollmentManager(tmp_path)
 
-    def _make_frame(self, height=480, width=640, brightness=128, dtype=np.uint8):
-        frame = np.full((height, width, 3), brightness, dtype=dtype)
+    def _make_frame(self, height=480, width=640, brightness=128):
+        frame = np.full((height, width, 3), brightness, dtype=np.int16)
+        noise = np.random.randint(-30, 30, (height, width, 3), dtype=np.int16)
+        frame = np.clip(frame + noise, 0, 255).astype(np.uint8)
         return frame
 
     def test_too_far_face_too_small(self, manager):
@@ -20,19 +22,19 @@ class TestCheckQuality:
         assert result == "too_far"
 
     def test_blurry_low_laplacian_variance(self, manager):
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        frame = np.zeros((480, 640, 3), dtype=np.uint8) # no noise = blurry
         top, right, bottom, left = 100, 300, 300, 100
         result = manager.check_quality(frame, (top, right, bottom, left))
         assert result == "blurry"
 
     def test_too_dark(self, manager):
-        frame = np.full((480, 640, 3), 10, dtype=np.uint8)
+        frame = self._make_frame(brightness=10)
         top, right, bottom, left = 100, 500, 400, 140
         result = manager.check_quality(frame, (top, right, bottom, left))
         assert result == "too_dark"
 
     def test_too_bright(self, manager):
-        frame = np.full((480, 640, 3), 250, dtype=np.uint8)
+        frame = self._make_frame(brightness=250)
         top, right, bottom, left = 100, 500, 400, 140
         result = manager.check_quality(frame, (top, right, bottom, left))
         assert result == "too_bright"

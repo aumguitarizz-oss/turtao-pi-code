@@ -60,10 +60,13 @@ class TestPersonTracker:
         tracker.process_frame(frame)
         assert tracker._frame_count == 2
 
-    def test_correct_frame_count_increment(self):
+    @patch("turtao.vision.person_tracker.PersonTracker._infer")
+    def test_correct_frame_count_increment(self, mock_infer):
         tracker = PersonTracker.__new__(PersonTracker)
-        tracker._session = None
+        tracker._session = MagicMock()
         tracker._tracker = MagicMock()
+        tracker._tracker.update_with_detections.return_value = []
+        mock_infer.return_value = MagicMock()
         tracker._active = True
         tracker._frame_count = 0
         tracker._last_persons = []

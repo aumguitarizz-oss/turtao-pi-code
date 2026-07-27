@@ -35,6 +35,9 @@ class ThreatState:
     face_crop: bytes | None = None
     confidence: float = 0.0
     timestamp: float | None = None
+    box: tuple[int, int, int, int] | None = None
+    landmarks: list[tuple[int, int]] = field(default_factory=list)
+    name: str = ""
 
 
 @dataclass
@@ -87,6 +90,10 @@ class AppState:
         self.frame_counter: int = 0
         self.latest_frame: np.ndarray | None = None
         self.latest_annotated_frame: np.ndarray | None = None
+        self.latest_persons: list[dict[str, Any]] = []
+        self.show_yolo: bool = True
+        self.show_mediapipe: bool = False
+        self.pose_landmarks: list[tuple[int, int]] = []
         self.frame_queue: deque = deque(maxlen=2)
         self.events: deque[Event] = deque(maxlen=50)
         self.event_counter: int = 0

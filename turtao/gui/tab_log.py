@@ -1,7 +1,7 @@
-import tkinter as tk
-from tkinter import ttk
-from collections import deque
 import logging
+import tkinter as tk
+from collections import deque
+from tkinter import ttk
 
 
 class LogTab:
@@ -35,7 +35,6 @@ class LogTab:
         self._text.configure(state=tk.DISABLED)
 
     def refresh(self) -> None:
-        logger = logging.getLogger()
         new_lines: list[str] = []
         handler = _CaptureHandler.instance
         if handler is not None:
@@ -62,7 +61,7 @@ class _CaptureHandler(logging.Handler):
         )
         _CaptureHandler.instance = self
 
-    def emit(self, record: logging.Record) -> None:
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record) + "\n"
             self._buffer.append(msg)

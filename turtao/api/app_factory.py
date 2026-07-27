@@ -1,7 +1,8 @@
+import logging
+
 from flask import Flask
 from flask_cors import CORS
 from flask_sock import Sock
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,17 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     from turtao.api.errors import register_error_handlers
     register_error_handlers(app)
 
-    from turtao.api import routes_camera, routes_alert, routes_environment, routes_mode
-    from turtao.api import routes_control, routes_faces, routes_settings, routes_ble, routes_misc
+    from turtao.api import (
+        routes_alert,
+        routes_ble,
+        routes_camera,
+        routes_control,
+        routes_environment,
+        routes_faces,
+        routes_misc,
+        routes_mode,
+        routes_settings,
+    )
 
     camera_bp = routes_camera.camera_bp
     alert_bp = routes_alert.alert_bp
@@ -59,8 +69,8 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     app.register_blueprint(ble_bp)
     app.register_blueprint(misc_bp)
 
-    from turtao.api.ws_status import register_status_ws
     from turtao.api.ws_intercom import register_intercom_ws
+    from turtao.api.ws_status import register_status_ws
     register_status_ws(sock, state)
     register_intercom_ws(sock)
 

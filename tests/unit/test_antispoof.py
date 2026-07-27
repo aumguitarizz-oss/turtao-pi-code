@@ -1,6 +1,9 @@
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
+
+pytest.importorskip("mediapipe")
+
 from turtao.vision.antispoof import AntiSpoofDetector, OVERLAP_THRESHOLD
 
 

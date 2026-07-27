@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Generator
+from typing import Callable, Generator
 
 import cv2
 import numpy as np

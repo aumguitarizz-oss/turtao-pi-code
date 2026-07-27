@@ -1,6 +1,8 @@
 import json
 import logging
+
 from flask import Blueprint, request
+
 from turtao.api.errors import APIError
 from turtao.state import Mode
 
@@ -39,7 +41,7 @@ def mode():
         )
 
     try:
-        setattr(st, "mode", Mode(new_mode))
+        st.mode = Mode(new_mode)
     except Exception as exc:
         raise APIError(str(exc), "MODE_FAILURE", 500) from exc
 

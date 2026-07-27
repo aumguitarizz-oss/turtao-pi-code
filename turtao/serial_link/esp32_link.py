@@ -47,31 +47,34 @@ class ESP32SerialLink(SerialLinkInterface):
             raise RuntimeError(f"Failed to open serial port {port}: {e}") from e
 
     def readline(self) -> str | None:
-        ser = self._ser
-        if ser is None or not ser.is_open:
-            return None
-        try:
-            line = ser.readline()
-            if not line:
+        with self._lock:
+            ser = self._ser
+            if ser is None or not ser.is_open:
                 return None
-            return line.decode("utf-8", errors="replace").strip()
-        except serial.SerialException as e:
-            logger.error("Serial read error: %s", e)
-            return None
+            try:
+                line = ser.readline()
+                if not line:
+                    return None
+                return line.decode("utf-8", errors="replace").strip()
+            except serial.SerialException as e:
+                logger.error("Serial read error: %s", e)
+                return None
 
     def write(self, data: str) -> None:
-        ser = self._ser
-        if ser is None or not ser.is_open:
-            logger.warning("Cannot write: serial port not open")
-            return
-        try:
-            ser.write(data.encode("utf-8"))
-        except serial.SerialException as e:
-            logger.error("Serial write error: %s", e)
+        with self._lock:
+            ser = self._ser
+            if ser is None or not ser.is_open:
+                logger.warning("Cannot write: serial port not open")
+                return
+            try:
+                ser.write(data.encode("utf-8"))
+            except serial.SerialException as e:
+                logger.error("Serial write error: %s", e)
 
     def is_connected(self) -> bool:
-        ser = self._ser
-        return ser is not None and ser.is_open
+        with self._lock:
+            ser = self._ser
+            return ser is not None and ser.is_open
 
     def close(self) -> None:
         with self._lock:

@@ -141,8 +141,16 @@ class SettingsTab:
             pass
 
     def _toggle_notif(self, key: str) -> None:
+        mapping = {
+            "notif_threat": "threat",
+            "notif_gas": "gas_danger",
+            "notif_low_battery": "low_battery",
+            "notif_tamper": "tamper",
+            "notif_connection": "connection_lost",
+        }
         val = self._bool_vars[f"notifications.{key}"].get()
-        setattr(self.core.settings.notifications, key, val)
+        real_key = mapping.get(key, key)
+        setattr(self.core.settings.notifications, real_key, val)
         try:
             from turtao.config import save_settings
             save_settings(self.core.settings)
@@ -161,10 +169,18 @@ class SettingsTab:
 
     def refresh(self) -> None:
         s = self.core.settings
+        mapping = {
+            "notif_threat": "threat",
+            "notif_gas": "gas_danger",
+            "notif_low_battery": "low_battery",
+            "notif_tamper": "tamper",
+            "notif_connection": "connection_lost",
+        }
         for attr in self._bool_vars:
             if attr.startswith("notifications."):
                 key = attr.split(".", 1)[1]
-                val = getattr(s.notifications, key, False)
+                real_key = mapping.get(key, key)
+                val = getattr(s.notifications, real_key, False)
                 self._bool_vars[attr].set(val)
             else:
                 val = getattr(s, attr, False)

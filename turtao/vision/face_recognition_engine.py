@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import deque, Counter
 from pathlib import Path
-from typing import Any
 
 import cv2
 import face_recognition
 import numpy as np
 
 from turtao.state import AppState, ThreatLabel
+from turtao.vision.enrollment import preprocess_frame  # Option A: shared preprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,10 @@ PAN_MIN = 10
 PAN_MAX = 170
 TILT_MIN = 10
 TILT_MAX = 170
+
+# Temporal smoothing: vote over this many recent frames before confirming a label
+SMOOTHING_WINDOW = 6  # frames
+MIN_VOTES_TO_CONFIRM = 4  # need ≥4/6 agreement to flip label
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -48,13 +53,26 @@ def _calculate_aim(
 
 
 class FaceRecognitionEngine:
-    def __init__(self, state: AppState, tolerance: float = 0.52) -> None:
+    def __init__(self, state: AppState, tolerance: float = 0.6) -> None:
         self._state = state
         self._tolerance = tolerance
         self._known_embeddings: list[np.ndarray] = []
         self._known_names: list[str] = []
+        self._unknown_embeddings: list[np.ndarray] = []
+        self._unknown_names: list[str] = []
         self._last_unknown_save = 0.0
         self._last_tts_threat = 0.0
+        self._frames_since_seen = 0
+
+        # Temporal smoothing buffers
+        self._label_history: deque[ThreatLabel] = deque(maxlen=SMOOTHING_WINDOW)
+        self._name_history: deque[str] = deque(maxlen=SMOOTHING_WINDOW)
+        self._box_history: deque[tuple[int, int, int, int] | None] = deque(maxlen=SMOOTHING_WINDOW)
+
+        # Confirmed (stable) outputs
+        self._confirmed_label: ThreatLabel = ThreatLabel.IDLE
+        self._confirmed_name: str = ""
+        self._confirmed_box: tuple[int, int, int, int] | None = None
 
     def load_embeddings(self, profile_dir: str) -> None:
         path = Path(profile_dir)
@@ -75,19 +93,41 @@ class FaceRecognitionEngine:
         )
 
     def process_frame(self, frame: np.ndarray) -> None:
-        small = cv2.resize(frame, (0, 0), fx=RESIZE_SCALE, fy=RESIZE_SCALE)
+        # Option A: preprocess before recognition
+        enhanced = preprocess_frame(frame)
+
+        small = cv2.resize(enhanced, (0, 0), fx=RESIZE_SCALE, fy=RESIZE_SCALE)
         rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         face_locations = face_recognition.face_locations(rgb_small, model="hog")
         face_encodings = face_recognition.face_encodings(rgb_small, face_locations)
 
         with self._state:
             if not face_locations:
-                self._state.threat_label = ThreatLabel.IDLE
+                self._frames_since_seen += 1
+                if self._frames_since_seen > 5:  # persistence limit
+                    self._state.threat_label = ThreatLabel.IDLE
+                    self._state.threat_state.box = None
+                    self._state.threat_state.landmarks = []
+                    self._state.threat_state.name = ""
+                    self._state.threat_state.active = False
+                    # Reset smoothing on long absence
+                    self._label_history.clear()
+                    self._name_history.clear()
+                    self._box_history.clear()
+                    self._confirmed_label = ThreatLabel.IDLE
+                    self._confirmed_name = ""
+                    self._confirmed_box = None
                 return
 
-            best_match = ThreatLabel.THREAT
+            self._frames_since_seen = 0
+            raw_match = ThreatLabel.THREAT
+            raw_name = "Unknown"
+            raw_box = None
             best_confidence = 0.0
-            best_box = None
+            best_landmarks: list[tuple[int, int]] = []
+
+            # Get raw landmarks at small resolution
+            landmarks_list = face_recognition.face_landmarks(rgb_small, face_locations)
 
             for i, encoding in enumerate(face_encodings):
                 top, right, bottom, left = face_locations[i]
@@ -97,53 +137,128 @@ class FaceRecognitionEngine:
                 right = int(right / RESIZE_SCALE)
                 bottom = int(bottom / RESIZE_SCALE)
 
-                if not self._known_embeddings:
-                    best_match = ThreatLabel.THREAT
-                    best_box = (left, top, right, bottom)
-                    break
+                # Landmarks for first face only
+                if i == 0 and landmarks_list:
+                    face_lms = landmarks_list[0]
+                    for feature, points in face_lms.items():
+                        for pt in points:
+                            scaled_x = int(pt[0] / RESIZE_SCALE)
+                            scaled_y = int(pt[1] / RESIZE_SCALE)
+                            best_landmarks.append((scaled_x, scaled_y))
 
-                sims = [
-                    cosine_similarity(encoding, known)
-                    for known in self._known_embeddings
-                ]
-                max_sim = max(sims) if sims else 0.0
+                # Check against known enrolled profiles
+                if self._known_embeddings:
+                    distances = [
+                        np.linalg.norm(encoding - known)
+                        for known in self._known_embeddings
+                    ]
+                    min_idx = int(np.argmin(distances))
+                    min_dist = distances[min_idx]
 
-                if max_sim >= self._tolerance:
-                    best_match = ThreatLabel.SAFE
-                    best_confidence = max_sim
-                    best_box = (left, top, right, bottom)
-                    break
-                else:
-                    if max_sim > best_confidence:
-                        best_confidence = max_sim
-                        best_box = (left, top, right, bottom)
+                    if min_dist <= self._tolerance:
+                        raw_match = ThreatLabel.SAFE
+                        best_confidence = 1.0 - min_dist
+                        raw_box = (left, top, right, bottom)
+                        # Strip the pose-index suffix: "alice_000" → "alice"
+                        stem = self._known_names[min_idx]
+                        raw_name = stem.rsplit("_", 1)[0] if "_" in stem else stem
+                        break
 
-            if best_match == ThreatLabel.THREAT:
+                # Check session unknowns
+                if self._unknown_embeddings:
+                    u_distances = [
+                        np.linalg.norm(encoding - u_emb)
+                        for u_emb in self._unknown_embeddings
+                    ]
+                    min_u_idx = int(np.argmin(u_distances))
+                    min_u_dist = u_distances[min_u_idx]
+
+                    if min_u_dist <= self._tolerance:
+                        raw_match = ThreatLabel.THREAT
+                        best_confidence = 1.0 - min_u_dist
+                        raw_box = (left, top, right, bottom)
+                        raw_name = self._unknown_names[min_u_idx]
+                        break
+
+                # Completely new unknown face
+                new_id = len(self._unknown_embeddings) + 1
+                new_name = f"Unknown {new_id}"
+                self._unknown_embeddings.append(encoding)
+                self._unknown_names.append(new_name)
+
+                raw_match = ThreatLabel.THREAT
+                best_confidence = 0.0
+                raw_box = (left, top, right, bottom)
+                raw_name = new_name
+                break
+
+            # ----------------------------------------------------------------
+            # Temporal smoothing: only commit a label change when we have
+            # consistent votes over the last N frames.  This eliminates the
+            # "Unknown 1 / Unknown 2" flicker on ambiguous frames.
+            # ----------------------------------------------------------------
+            self._label_history.append(raw_match)
+            self._name_history.append(raw_name)
+            self._box_history.append(raw_box)
+
+            if len(self._label_history) >= SMOOTHING_WINDOW:
+                label_counts = Counter(self._label_history)
+                top_label, top_count = label_counts.most_common(1)[0]
+                if top_count >= MIN_VOTES_TO_CONFIRM:
+                    self._confirmed_label = top_label
+
+                name_counts = Counter(self._name_history)
+                top_name, name_count = name_counts.most_common(1)[0]
+                if name_count >= MIN_VOTES_TO_CONFIRM:
+                    self._confirmed_name = top_name
+            else:
+                # Not enough history yet — use raw values
+                self._confirmed_label = raw_match
+                self._confirmed_name = raw_name
+
+            # Box: use the most recent valid box (smoothing boxes isn't needed —
+            # it would cause lag in the bounding box tracking)
+            self._confirmed_box = raw_box if raw_box is not None else self._confirmed_box
+
+            # ----------------------------------------------------------------
+            # Save unknown / TTS (use raw_match so we react quickly)
+            # ----------------------------------------------------------------
+            if raw_match == ThreatLabel.THREAT:
                 now = time.time()
                 if now - self._last_unknown_save >= UNKNOWN_SAVE_INTERVAL:
-                    self._save_unknown(frame, best_box)
+                    self._save_unknown(frame, raw_box)
                     self._last_unknown_save = now
                 if now - self._last_tts_threat >= TTS_DEBOUNCE_INTERVAL:
                     logger.info("TTS trigger: unknown face detected")
                     self._last_tts_threat = now
-                self._update_threat_state(best_box, best_confidence)
 
-            self._state.threat_label = best_match
+            # Push confirmed (stable) values to state
+            self._update_threat_state(
+                self._confirmed_box,
+                best_confidence,
+                best_landmarks,
+                self._confirmed_name,
+            )
+            self._state.threat_label = self._confirmed_label
 
-            if best_match == ThreatLabel.THREAT and best_box is not None:
-                pan, tilt = _calculate_aim(*best_box)
+            if self._confirmed_label == ThreatLabel.THREAT and self._confirmed_box is not None:
+                pan, tilt = _calculate_aim(*self._confirmed_box)
                 self._state.pan = pan
                 self._state.tilt = tilt
 
     def _update_threat_state(
-        self, box: tuple[int, int, int, int] | None, confidence: float
+        self,
+        box: tuple[int, int, int, int] | None,
+        confidence: float,
+        landmarks: list[tuple[int, int]],
+        name: str,
     ) -> None:
-        face_crop = None
-        if box is not None:
-            l, t, r, b = box
         self._state.threat_state.active = True
         self._state.threat_state.confidence = confidence
         self._state.threat_state.timestamp = time.time()
+        self._state.threat_state.box = box
+        self._state.threat_state.landmarks = landmarks
+        self._state.threat_state.name = name
 
     @staticmethod
     def _save_unknown(frame: np.ndarray, box: tuple[int, int, int, int] | None) -> None:

@@ -1,4 +1,5 @@
 import logging
+
 from flask import Blueprint, Response, send_file
 
 logger = logging.getLogger(__name__)

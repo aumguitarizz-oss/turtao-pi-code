@@ -3,17 +3,27 @@ from __future__ import annotations
 import logging
 
 import cv2
-import mediapipe as mp
 import numpy as np
+
+try:
+    import mediapipe as mp
+except ImportError:
+    mp = None
 
 logger = logging.getLogger(__name__)
 
 OVERLAP_THRESHOLD = 0.35
 
 
+from typing import Any
+
+
 class AntiSpoofDetector:
     def __init__(self) -> None:
-        self._hands: mp.solutions.hands.Hands | None = None
+        self._hands: Any | None = None
+        if mp is None:
+            logger.warning("MediaPipe not available, anti-spoofing disabled")
+            return
         try:
             self._hands = mp.solutions.hands.Hands(
                 static_image_mode=False,

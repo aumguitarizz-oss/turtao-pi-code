@@ -1,6 +1,8 @@
 import json
 import logging
+
 from flask import Blueprint, request
+
 from turtao.api.errors import APIError
 from turtao.state import Mode
 

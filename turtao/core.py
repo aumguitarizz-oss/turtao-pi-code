@@ -1,25 +1,26 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
-import logging
 from pathlib import Path
 from typing import Any
 
-from turtao.config import AppConfig, Settings, BASE_DIR
-from turtao.state import AppState, Mode, ThreatLabel
+from turtao.api.ws_status import ws_broadcast_loop
+from turtao.audio.bluetooth_manager import BluetoothManager, bluetooth_loop
+from turtao.audio.tts import TTSManager
+from turtao.config import BASE_DIR, AppConfig, Settings
 from turtao.hardware.interfaces import CameraInterface, SerialLinkInterface
+from turtao.patrol.patrol_loop import patrol_loop, set_safe_mode, set_speed
 from turtao.serial_link.esp32_link import ESP32SerialLink
 from turtao.serial_link.protocol import encode_command
+from turtao.state import AppState, Mode, ThreatLabel
+from turtao.vision.antispoof import AntiSpoofDetector
 from turtao.vision.camera import Camera, camera_capture_loop
+from turtao.vision.enrollment import EnrollmentManager
 from turtao.vision.face_recognition_engine import FaceRecognitionEngine
 from turtao.vision.person_tracker import PersonTracker
-from turtao.vision.antispoof import AntiSpoofDetector
-from turtao.vision.enrollment import EnrollmentManager
-from turtao.audio.tts import TTSManager
-from turtao.audio.bluetooth_manager import BluetoothManager, bluetooth_loop
-from turtao.patrol.patrol_loop import patrol_loop, set_speed, set_safe_mode
-from turtao.api.ws_status import ws_broadcast_loop
+from turtao.vision.pose_tracker import PoseTracker
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class TurtaoCore:
         self.tracker = PersonTracker(model_path)
         self.antispoof = AntiSpoofDetector()
         self.enrollment = EnrollmentManager(face_data_dir)
+        self.pose_tracker = PoseTracker(state)
 
         self.tts = TTSManager(piper_dir)
         self.bt_manager = BluetoothManager(config.jbl_mac)
@@ -119,13 +121,25 @@ class TurtaoCore:
             with self.state:
                 active = self.state.mode != Mode.IDLE
                 frame = self.state.latest_frame
+                show_mp = self.state.show_mediapipe
 
             self.tracker.set_active(active)
             if active and frame is not None:
                 try:
-                    self.tracker.process_frame(frame)
+                    persons = self.tracker.process_frame(frame)
+                    with self.state:
+                        self.state.latest_persons = persons
                 except Exception:
                     logger.exception("Person tracker error")
+                
+                if show_mp:
+                    self.pose_tracker.process_frame(frame)
+                else:
+                    with self.state:
+                        self.state.pose_landmarks = []
+            else:
+                with self.state:
+                    self.state.pose_landmarks = []
             time.sleep(0.05)
 
     def _serial_wrapper(self) -> None:

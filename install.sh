@@ -25,7 +25,7 @@ sudo apt-get install -y -qq \
     libssl-dev \
     libffi-dev \
     libhdf5-dev \
-    libatlas-base-dev \
+    libhdf5-dev \
     portaudio19-dev \
     libsdl2-dev \
     libsdl2-mixer-dev \
@@ -37,7 +37,6 @@ sudo apt-get install -y -qq \
     bluez-tools \
     pulseaudio-module-bluetooth \
     pi-bluetooth \
-    aplay \
     alsa-utils
 
 # ── Serial enable & user groups ──────────────────────────────────────
@@ -50,7 +49,8 @@ sudo usermod -a -G audio "$USER"
 # ── Python venv ──────────────────────────────────────────────────────
 echo ">>> Creating Python virtual environment..."
 if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv "$VENV_DIR"
+    # Using pyenv Python 3.12 because mediapipe and others lack 3.13 wheels
+    "$HOME/.pyenv/versions/3.12.8/bin/python" -m venv "$VENV_DIR"
 fi
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
@@ -58,25 +58,7 @@ pip install --upgrade pip setuptools wheel --quiet
 
 # ── Python packages (in order) ──────────────────────────────────────
 echo ">>> Installing Python packages..."
-pip install --quiet \
-    flask==3.0.0 \
-    flask-cors==4.0.0 \
-    flask-sock==0.7.0 \
-    pyserial==3.5 \
-    python-dotenv==1.0.0 \
-    pydantic==2.0.0 \
-    numpy==1.24.0 \
-    pillow==10.0.0 \
-    opencv-python-headless==4.8.0.74 \
-    face_recognition==1.3.0 \
-    mediapipe==0.10.0 \
-    ultralytics==8.0.0 \
-    onnxruntime==1.15.0 \
-    supervision==0.18.0 \
-    openai-whisper==20231117 \
-    openwakeword==0.4.0 \
-    pyaudio==0.2.11 \
-    scipy==1.11.0
+pip install --quiet -r "$REPO_DIR/requirements.txt"
 
 # ── Dev packages ────────────────────────────────────────────────────
 echo ">>> Installing dev packages..."
@@ -105,7 +87,7 @@ echo ">>> Downloading Piper TTS (ARM64)..."
 mkdir -p "$PIPER_DIR"
 if [ ! -f "$PIPER_DIR/piper" ]; then
     PIPER_VER="2023.11.14-2"
-    ARCH="aarch64"
+    ARCH="linux_aarch64"
     wget -q "https://github.com/rhasspy/piper/releases/download/$PIPER_VER/piper_$ARCH.tar.gz" \
         -O /tmp/piper.tar.gz
     tar -xzf /tmp/piper.tar.gz -C "$PIPER_DIR"
