@@ -51,7 +51,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     ble_bp = routes_ble.ble_bp
     misc_bp = routes_misc.misc_bp
 
-    routes_camera.inject_deps(camera=camera)
+    routes_camera.inject_deps(camera=camera, state=state)
     routes_alert.inject_deps(state=state)
     routes_environment.inject_deps(state=state)
     routes_mode.inject_deps(state=state, serial=serial_link)

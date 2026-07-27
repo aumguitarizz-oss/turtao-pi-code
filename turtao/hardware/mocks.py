@@ -65,3 +65,9 @@ class MockCamera(CameraInterface):
 
     def set_fail_on_read(self, fail: bool) -> None:
         self._fail_on_read = fail
+
+    def get_latest_frame(self) -> bytes | None:
+        ret, _frame = self.read()
+        if not ret:
+            return None
+        return b"fake_jpeg"

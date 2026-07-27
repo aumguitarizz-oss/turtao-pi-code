@@ -3,6 +3,8 @@ import logging
 
 from flask import Blueprint, Response, send_file
 
+from turtao.vision.mjpeg import generate_mjpeg_stream
+
 logger = logging.getLogger(__name__)
 
 camera_bp = Blueprint("camera", __name__)
@@ -16,10 +18,13 @@ def inject_deps(**kwargs) -> None:
 
 @camera_bp.route("/api/stream")
 def stream():
-    cam = _deps.get("camera")
-    if cam is None:
-        return {"error": "SERVICE_UNAVAILABLE", "detail": "Camera not available"}, 503
-    return Response(cam.generate_mjpeg_stream(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    state = _deps.get("state")
+    if state is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
+    return Response(
+        generate_mjpeg_stream(get_frame=lambda: state.latest_frame),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 @camera_bp.route("/api/snapshot")

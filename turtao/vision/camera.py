@@ -35,6 +35,15 @@ class Camera(CameraInterface):
         if self._cap is not None:
             self._cap.release()
 
+    def get_latest_frame(self) -> bytes | None:
+        ret, frame = self.read()
+        if not ret or frame is None:
+            return None
+        ok, buf = cv2.imencode(".jpg", frame)
+        if not ok:
+            return None
+        return buf.tobytes()
+
 
 def camera_capture_loop(state: AppState, camera: CameraInterface) -> None:
     """Daemon thread target. Continuously captures frames, pushes to frame_queue.

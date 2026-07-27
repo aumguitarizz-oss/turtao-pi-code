@@ -282,7 +282,7 @@ def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engin
 
     inject_alert(state=mock_state)
     inject_audio(tts=mock_tts)
-    inject_camera(camera=MagicMock())
+    inject_camera(camera=MagicMock(), state=mock_state)
     inject_control(state=mock_state, serial=mock_serial, settings=mock_settings)
     inject_env(state=mock_state)
     inject_faces(face_engine=mock_face_engine, enrollment=mock_enrollment, config=MagicMock(), state=mock_state)

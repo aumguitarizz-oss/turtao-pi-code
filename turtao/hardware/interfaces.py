@@ -34,3 +34,7 @@ class CameraInterface(ABC):
     @abstractmethod
     def release(self) -> None:
         ...
+
+    @abstractmethod
+    def get_latest_frame(self) -> bytes | None:
+        ...

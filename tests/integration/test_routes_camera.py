@@ -19,3 +19,10 @@ class TestCameraRoutes:
         routes_camera._deps["camera"] = cam
         resp = client.get("/api/snapshot")
         assert resp.status_code == 503
+
+    def test_stream_returns_multipart_mjpeg(self, client, mock_state):
+        import numpy as np
+        mock_state.latest_frame = np.zeros((10, 10, 3), dtype=np.uint8)
+        resp = client.get("/api/stream")
+        assert resp.status_code == 200
+        assert "multipart/x-mixed-replace" in resp.content_type
