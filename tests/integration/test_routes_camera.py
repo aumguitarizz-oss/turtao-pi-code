@@ -26,3 +26,8 @@ class TestCameraRoutes:
         resp = client.get("/api/stream")
         assert resp.status_code == 200
         assert "multipart/x-mixed-replace" in resp.content_type
+        # Consume one frame from the real stream to prove the generator
+        # actually produces valid MJPEG framing, not just correct headers.
+        chunk = next(resp.response)
+        assert b"--frame" in chunk
+        assert b"Content-Type: image/jpeg" in chunk
