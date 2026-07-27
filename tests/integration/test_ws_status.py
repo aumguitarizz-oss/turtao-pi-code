@@ -96,6 +96,17 @@ class TestStatusBroadcaster:
         broadcaster = StatusBroadcaster(mock_state)
         broadcaster.broadcast()
 
+    def test_build_status_with_bytes_face_crop_does_not_raise(self, mock_state):
+        import json
+        from turtao.api.ws_status import StatusBroadcaster
+
+        mock_state.threat_state.face_crop = b"\xff\xd8\xff\xe0fake jpeg bytes"
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+        # Must not raise, and face_crop must not be raw bytes
+        json.dumps(payload)
+        assert payload["data"]["threat"]["face_crop"] != b"\xff\xd8\xff\xe0fake jpeg bytes"
+
 
 class TestStatusWebSocket:
     def test_websocket_route_registered(self, app, mock_state):

@@ -50,7 +50,7 @@ class StatusBroadcaster:
                 "connected": st.connected,
                 "threat": {
                     "active": ts.active,
-                    "face_crop": ts.face_crop,
+                    "face_crop": ts.face_crop if isinstance(ts.face_crop, str) else None,
                     "confidence": ts.confidence,
                     "timestamp": ts.timestamp,
                 },
