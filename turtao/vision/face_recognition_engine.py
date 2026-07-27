@@ -125,7 +125,10 @@ class FaceRecognitionEngine:
         return thumb_path.read_bytes()
 
     def delete_face(self, name: str) -> None:
-        matches = list(self._embeddings_dir.glob(f"{name}_*.npy"))
+        matches = [
+            f for f in self._embeddings_dir.glob("*.npy")
+            if re.sub(r"_\d{3}$", "", f.stem) == name
+        ]
         if not matches:
             raise ValueError(f"Face '{name}' not found")
         for m in matches:

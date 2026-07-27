@@ -188,6 +188,13 @@ class TestDeleteFace:
         with pytest.raises(ValueError):
             engine.delete_face("nobody")
 
+    def test_does_not_delete_other_face_with_prefix_name(self, engine):
+        _write_embedding(engine, "bob", 0)
+        _write_embedding(engine, "bob_smith", 0)
+        engine.delete_face("bob")
+        assert engine.face_exists("bob") is False
+        assert engine.face_exists("bob_smith") is True
+
 
 class TestUnknowns:
     def test_list_unknowns_empty(self, engine):
