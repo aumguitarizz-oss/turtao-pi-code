@@ -56,7 +56,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     routes_environment.inject_deps(state=state)
     routes_mode.inject_deps(state=state, serial=serial_link)
     routes_control.inject_deps(state=state, serial=serial_link, settings=settings)
-    routes_faces.inject_deps(face_engine=face_engine, enrollment=enrollment, config=config)
+    routes_faces.inject_deps(face_engine=face_engine, enrollment=enrollment, config=config, state=state)
     routes_settings.inject_deps(settings=settings, tts=tts)
     routes_ble.inject_deps(state=state, settings=settings, serial=serial_link)
     routes_misc.inject_deps(state=state, serial=serial_link, settings=settings)

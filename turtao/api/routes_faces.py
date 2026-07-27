@@ -17,11 +17,13 @@ def inject_deps(**kwargs) -> None:
 
 
 def _enrollment_status(enroll) -> dict:
+    s = enroll.get_status()
+    active = s.get("status") == "active"
     return {
-        "active": enroll.active,
-        "pose_index": enroll.pose_index,
-        "poses_total": enroll.poses_total,
-        "quality_issue": enroll.quality_issue,
+        "active": active,
+        "pose_index": (s.get("pose", 1) - 1) if active else 0,
+        "poses_total": s.get("total_poses", 5),
+        "quality_issue": s.get("quality_issue") or None,
     }
 
 
@@ -102,7 +104,8 @@ def enroll_start():
     if enroll is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
 
-    if enroll.active:
+    status = enroll.get_status()
+    if status.get("status") == "active":
         raise APIError("Enrollment already in progress", "ENROLL_IN_PROGRESS", 409)
 
     engine = _deps.get("face_engine")
@@ -110,7 +113,7 @@ def enroll_start():
         raise APIError(f"Face '{name}' already exists", "FACE_EXISTS", 409)
 
     try:
-        enroll.start(name)
+        enroll.start_enrollment(name)
     except Exception as exc:
         raise APIError(str(exc), "ENROLL_FAILURE", 500) from exc
 
@@ -123,11 +126,16 @@ def enroll_capture():
     if enroll is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
 
-    if not enroll.active:
+    if enroll.get_status().get("status") != "active":
         raise APIError("No active enrollment", "NO_ENROLLMENT", 409)
 
+    state = _deps.get("state")
+    frame = state.latest_frame if state is not None else None
+    if frame is None:
+        raise APIError("No camera frame available", "NO_FRAME", 503)
+
     try:
-        enroll.capture()
+        enroll.capture_pose(frame)
     except Exception as exc:
         raise APIError(str(exc), "CAPTURE_FAILURE", 500) from exc
 
@@ -141,7 +149,7 @@ def enroll_cancel():
         return {"error": "SERVICE_UNAVAILABLE", "detail": "Enrollment not available"}, 503
 
     try:
-        enroll.cancel()
+        enroll.cancel_enrollment()
     except Exception as exc:
         raise APIError(str(exc), "CANCEL_FAILURE", 500) from exc
 

@@ -31,6 +31,7 @@ class MockState:
         self.event_log = []
         self.map_grid = []
         self.map_trail = []
+        self.latest_frame = "fake_frame"
 
     def acquire(self):
         pass
@@ -95,25 +96,47 @@ class MockSettings:
 
 class MockEnrollment:
     def __init__(self):
-        self.active = False
-        self.pose_index = 0
-        self.poses_total = 5
-        self.quality_issue = None
+        self._active_name = None
+        self._pose_index = 0
+        self._poses_total = 5
+        self._quality_issue = ""
+        self._fail_next_capture = False
 
-    def start(self, name):
-        self.active = True
-        self.pose_index = 0
+    def start_enrollment(self, name):
+        self._active_name = name
+        self._pose_index = 0
+        self._quality_issue = ""
+        return {"status": "ok", "pose": 1, "total_poses": self._poses_total}
 
-    def capture(self):
-        if not self.active:
-            raise RuntimeError("No active enrollment")
-        self.pose_index += 1
-        if self.pose_index >= self.poses_total:
-            self.active = False
+    def capture_pose(self, frame):
+        if self._active_name is None:
+            return {"status": "error", "message": "No active enrollment"}
+        if self._fail_next_capture:
+            self._fail_next_capture = False
+            self._quality_issue = "blurry"
+            return {"status": "retry", "guidance": "blurry", "pose": self._pose_index + 1, "total_poses": self._poses_total}
+        self._quality_issue = ""
+        self._pose_index += 1
+        if self._pose_index >= self._poses_total:
+            name = self._active_name
+            self._active_name = None
+            return {"status": "complete", "name": name}
+        return {"status": "next_pose", "pose": self._pose_index + 1, "total_poses": self._poses_total}
 
-    def cancel(self):
-        self.active = False
-        self.pose_index = 0
+    def cancel_enrollment(self):
+        self._active_name = None
+        self._pose_index = 0
+        return {"status": "ok"}
+
+    def get_status(self):
+        if self._active_name is None:
+            return {"status": "idle"}
+        return {
+            "status": "active",
+            "pose": self._pose_index + 1,
+            "total_poses": self._poses_total,
+            "quality_issue": self._quality_issue,
+        }
 
 
 class MockFaceEngine:
@@ -262,7 +285,7 @@ def app(mock_state, mock_settings, mock_serial, mock_enrollment, mock_face_engin
     inject_camera(camera=MagicMock())
     inject_control(state=mock_state, serial=mock_serial, settings=mock_settings)
     inject_env(state=mock_state)
-    inject_faces(face_engine=mock_face_engine, enrollment=mock_enrollment, config=MagicMock())
+    inject_faces(face_engine=mock_face_engine, enrollment=mock_enrollment, config=MagicMock(), state=mock_state)
     inject_mode(state=mock_state, serial=mock_serial)
     inject_settings(settings=mock_settings, tts=mock_tts)
     inject_ble(state=mock_state, bt_manager=mock_bt_manager, settings=mock_settings, serial=mock_serial)

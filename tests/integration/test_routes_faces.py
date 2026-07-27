@@ -74,7 +74,7 @@ class TestFacesRoutes:
         assert resp.get_json() == {
             "active": False, "pose_index": 0, "poses_total": 5, "quality_issue": None,
         }
-        assert mock_enrollment.active is False
+        assert mock_enrollment.get_status()["status"] == "idle"
 
     def test_enroll_cancel_without_active_returns_error(self, client):
         resp = client.post("/api/faces/enroll/cancel")
