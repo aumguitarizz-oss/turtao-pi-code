@@ -9,6 +9,21 @@ from turtao.vision.face_recognition_engine import (
 from turtao.state import AppState, ThreatLabel
 
 
+@pytest.fixture
+def engine(tmp_path):
+    face_data_dir = tmp_path / "face_data"
+    embeddings_dir = face_data_dir / "embeddings"
+    embeddings_dir.mkdir(parents=True)
+    eng = FaceRecognitionEngine(AppState(), tolerance=0.6)
+    eng.load_embeddings(str(embeddings_dir))
+    return eng
+
+
+def _write_embedding(engine, name, pose):
+    path = engine._embeddings_dir / f"{name}_{pose:03d}.npy"
+    np.save(str(path), np.zeros(128))
+
+
 class TestCosineSimilarity:
     def test_identical_vectors_returns_one(self):
         a = np.array([1.0, 2.0, 3.0])
@@ -131,3 +146,96 @@ class TestFaceRecognitionEngine:
         engine.load_embeddings("/nonexistent/path")
         assert "Embedding directory not found" in caplog.text
         assert engine._known_embeddings == []
+
+
+class TestListFaces:
+    def test_empty_when_no_embeddings(self, engine):
+        assert engine.list_faces() == []
+
+    def test_groups_multiple_poses_under_one_name(self, engine):
+        _write_embedding(engine, "alice", 0)
+        _write_embedding(engine, "alice", 1)
+        _write_embedding(engine, "alice", 2)
+        faces = engine.list_faces()
+        assert len(faces) == 1
+        assert faces[0].name == "alice"
+        assert faces[0].pose_count == 3
+
+    def test_strips_pose_suffix_not_full_stem(self, engine):
+        _write_embedding(engine, "bob_smith", 0)
+        faces = engine.list_faces()
+        assert faces[0].name == "bob_smith"  # only the trailing _NNN is stripped
+
+
+class TestFaceExists:
+    def test_true_when_present(self, engine):
+        _write_embedding(engine, "carol", 0)
+        assert engine.face_exists("carol") is True
+
+    def test_false_when_absent(self, engine):
+        assert engine.face_exists("nobody") is False
+
+
+class TestDeleteFace:
+    def test_removes_all_poses(self, engine):
+        _write_embedding(engine, "dave", 0)
+        _write_embedding(engine, "dave", 1)
+        engine.delete_face("dave")
+        assert engine.face_exists("dave") is False
+        assert list(engine._embeddings_dir.glob("dave_*.npy")) == []
+
+    def test_raises_value_error_when_absent(self, engine):
+        with pytest.raises(ValueError):
+            engine.delete_face("nobody")
+
+
+class TestUnknowns:
+    def test_list_unknowns_empty(self, engine):
+        assert engine.list_unknowns() == []
+
+    def test_list_unknowns_reads_directory(self, engine):
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        unknowns = engine.list_unknowns()
+        assert len(unknowns) == 1
+        assert unknowns[0].id == "unknown_20260101_120000"
+        assert unknowns[0].first_seen == "2026-01-01T12:00:00"
+        assert unknowns[0].cluster_count == 1
+
+    def test_get_unknown_thumb_returns_bytes(self, engine):
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake_jpeg")
+        assert engine.get_unknown_thumb("unknown_20260101_120000") == b"fake_jpeg"
+
+    def test_get_unknown_thumb_none_when_absent(self, engine):
+        assert engine.get_unknown_thumb("nope") is None
+
+    def test_delete_unknown_removes_file(self, engine):
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        engine.delete_unknown("unknown_20260101_120000")
+        assert engine.get_unknown_thumb("unknown_20260101_120000") is None
+
+    def test_delete_unknown_raises_when_absent(self, engine):
+        with pytest.raises(ValueError):
+            engine.delete_unknown("nope")
+
+    @patch("turtao.vision.face_recognition_engine.face_recognition")
+    @patch("turtao.vision.face_recognition_engine.cv2")
+    def test_promote_unknown_moves_to_faces(self, mock_cv2, mock_fr, engine):
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        mock_cv2.imread.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+        mock_cv2.cvtColor.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+        mock_fr.face_encodings.return_value = [np.zeros(128)]
+        engine.promote_unknown("unknown_20260101_120000", "erin")
+        assert engine.face_exists("erin") is True
+        assert engine.list_unknowns() == []
+
+    def test_promote_unknown_raises_when_absent(self, engine):
+        with pytest.raises(ValueError):
+            engine.promote_unknown("nope", "erin")

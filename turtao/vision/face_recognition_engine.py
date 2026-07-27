@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections import deque, Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
@@ -52,6 +54,19 @@ def _calculate_aim(
     return pan, tilt
 
 
+@dataclass
+class FaceSummary:
+    name: str
+    pose_count: int
+
+
+@dataclass
+class UnknownFaceSummary:
+    id: str
+    first_seen: str
+    cluster_count: int
+
+
 class FaceRecognitionEngine:
     def __init__(self, state: AppState, tolerance: float = 0.6) -> None:
         self._state = state
@@ -76,6 +91,7 @@ class FaceRecognitionEngine:
 
     def load_embeddings(self, profile_dir: str) -> None:
         path = Path(profile_dir)
+        self._embeddings_dir = path
         if not path.is_dir():
             logger.warning("Embedding directory not found: %s", profile_dir)
             return
@@ -84,13 +100,77 @@ class FaceRecognitionEngine:
         for npy_file in sorted(path.iterdir()):
             if npy_file.suffix != ".npy":
                 continue
-            name = npy_file.stem
+            name = re.sub(r"_\d{3}$", "", npy_file.stem)
             emb = np.load(str(npy_file))
             self._known_embeddings.append(emb)
             self._known_names.append(name)
         logger.info(
             "Loaded %d embeddings from %s", len(self._known_embeddings), profile_dir
         )
+
+    def list_faces(self) -> list[FaceSummary]:
+        counts: dict[str, int] = {}
+        for npy_file in sorted(self._embeddings_dir.glob("*.npy")):
+            name = re.sub(r"_\d{3}$", "", npy_file.stem)
+            counts[name] = counts.get(name, 0) + 1
+        return [FaceSummary(name=n, pose_count=c) for n, c in counts.items()]
+
+    def face_exists(self, name: str) -> bool:
+        return any(f.name == name for f in self.list_faces())
+
+    def get_thumb(self, name: str) -> bytes | None:
+        thumb_path = self._embeddings_dir.parent / "thumbs" / f"{name}.jpg"
+        if not thumb_path.is_file():
+            return None
+        return thumb_path.read_bytes()
+
+    def delete_face(self, name: str) -> None:
+        matches = list(self._embeddings_dir.glob(f"{name}_*.npy"))
+        if not matches:
+            raise ValueError(f"Face '{name}' not found")
+        for m in matches:
+            m.unlink()
+        self.load_embeddings(str(self._embeddings_dir))
+
+    def _unknowns_dir(self) -> Path:
+        return self._embeddings_dir.parent / "unknowns"
+
+    def list_unknowns(self) -> list[UnknownFaceSummary]:
+        unknown_dir = self._unknowns_dir()
+        if not unknown_dir.is_dir():
+            return []
+        out = []
+        for jpg in sorted(unknown_dir.glob("unknown_*.jpg")):
+            ts_str = jpg.stem.removeprefix("unknown_")
+            first_seen = time.strftime(
+                "%Y-%m-%dT%H:%M:%S", time.strptime(ts_str, "%Y%m%d_%H%M%S")
+            )
+            out.append(UnknownFaceSummary(id=jpg.stem, first_seen=first_seen, cluster_count=1))
+        return out
+
+    def get_unknown_thumb(self, id: str) -> bytes | None:
+        path = self._unknowns_dir() / f"{id}.jpg"
+        if not path.is_file():
+            return None
+        return path.read_bytes()
+
+    def delete_unknown(self, id: str) -> None:
+        path = self._unknowns_dir() / f"{id}.jpg"
+        if not path.is_file():
+            raise ValueError(f"Unknown '{id}' not found")
+        path.unlink()
+
+    def promote_unknown(self, face_id: str, name: str) -> None:
+        src = self._unknowns_dir() / f"{face_id}.jpg"
+        if not src.is_file():
+            raise ValueError(f"Unknown '{face_id}' not found")
+        frame = cv2.imread(str(src))
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        encodings = face_recognition.face_encodings(rgb)
+        if encodings:
+            np.save(str(self._embeddings_dir / f"{name}_000.npy"), encodings[0])
+        src.unlink()
+        self.load_embeddings(str(self._embeddings_dir))
 
     def process_frame(self, frame: np.ndarray) -> None:
         # Option A: preprocess before recognition
@@ -159,9 +239,9 @@ class FaceRecognitionEngine:
                         raw_match = ThreatLabel.SAFE
                         best_confidence = 1.0 - min_dist
                         raw_box = (left, top, right, bottom)
-                        # Strip the pose-index suffix: "alice_000" → "alice"
-                        stem = self._known_names[min_idx]
-                        raw_name = stem.rsplit("_", 1)[0] if "_" in stem else stem
+                        # _known_names already holds pose-suffix-stripped names
+                        # (see load_embeddings).
+                        raw_name = self._known_names[min_idx]
                         break
 
                 # Check session unknowns
