@@ -282,20 +282,16 @@ class EnrollmentManager:
             "guidance": guide,
         }
 
-    def capture_pose(self, frame: np.ndarray) -> dict[str, Any]:
+    def capture_pose(self, get_frame) -> dict[str, Any]:
         """
-        Option C: Burst-capture 5 frames in one call.
-
-        Takes `frame` as the first capture, then grabs 4 more frames
-        from the live camera feed (via the passed frame) with a short
-        delay between each.  All frames go through Option A preprocessing
-        before quality-gating and embedding.
+        Burst-capture FRAMES_PER_POSE frames, calling `get_frame()` fresh
+        for each one so the burst captures genuinely distinct frames
+        rather than five copies of a single snapshot.
         """
         if self._active_name is None:
             return {"status": "error", "message": "No active enrollment"}
 
-        # Run the full burst collection
-        burst_results = self._collect_burst(frame)
+        burst_results = self._collect_burst(get_frame)
         good_frames = [r for r in burst_results if r["ok"]]
         bad_frames  = [r for r in burst_results if not r["ok"]]
 
@@ -307,7 +303,6 @@ class EnrollmentManager:
         )
 
         if len(good_frames) < MIN_QUALITY_FRAMES:
-            # Work out the most common failure reason
             issues = [r.get("issue", "unknown") for r in bad_frames]
             top_issue = max(set(issues), key=issues.count) if issues else "unknown"
             self._last_quality_issue = top_issue
@@ -321,7 +316,6 @@ class EnrollmentManager:
                 "total_poses": REQUIRED_POSES,
             }
 
-        # Store all good embeddings
         for r in good_frames:
             self._pose_frames.append(r["frame"])
             self._pose_embeddings.append(r["embedding"])
@@ -369,28 +363,16 @@ class EnrollmentManager:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _collect_burst(self, first_frame: np.ndarray) -> list[dict[str, Any]]:
-        """
-        Option C: Collect FRAMES_PER_POSE frames, starting with `first_frame`.
-        Returns a list of result dicts with keys: ok, frame, embedding, issue.
-        """
-        frames_to_process: list[np.ndarray] = [first_frame]
+    def _collect_burst(self, get_frame) -> list[dict[str, Any]]:
+        """Collect FRAMES_PER_POSE genuinely distinct frames via get_frame(),
+        with a short delay between each so they represent different instants."""
+        frames_to_process: list[np.ndarray] = []
+        for i in range(FRAMES_PER_POSE):
+            if i > 0:
+                time.sleep(BURST_DELAY_MS / 1000.0)
+            frames_to_process.append(get_frame())
 
-        # Capture additional frames with a short delay between each
-        for _ in range(FRAMES_PER_POSE - 1):
-            time.sleep(BURST_DELAY_MS / 1000.0)
-            # We can only use what we've been given for the first frame;
-            # subsequent frames will be re-processed from the same source
-            # (the caller should ideally pass the latest frame each time;
-            #  for now we duplicate and vary with jitter — real improvement
-            #  would be to call camera.read() directly here).
-            frames_to_process.append(first_frame.copy())
-
-        results: list[dict[str, Any]] = []
-        for raw_frame in frames_to_process:
-            result = self._process_single_frame(raw_frame)
-            results.append(result)
-        return results
+        return [self._process_single_frame(f) for f in frames_to_process]
 
     def _process_single_frame(self, raw_frame: np.ndarray) -> dict[str, Any]:
         """Option A: Preprocess + quality-gate + embed one frame."""

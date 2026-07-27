@@ -130,12 +130,11 @@ def enroll_capture():
         raise APIError("No active enrollment", "NO_ENROLLMENT", 409)
 
     state = _deps.get("state")
-    frame = state.latest_frame if state is not None else None
-    if frame is None:
+    if state is None or state.latest_frame is None:
         raise APIError("No camera frame available", "NO_FRAME", 503)
 
     try:
-        enroll.capture_pose(frame)
+        enroll.capture_pose(lambda: state.latest_frame)
     except Exception as exc:
         raise APIError(str(exc), "CAPTURE_FAILURE", 500) from exc
 

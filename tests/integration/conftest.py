@@ -108,7 +108,7 @@ class MockEnrollment:
         self._quality_issue = ""
         return {"status": "ok", "pose": 1, "total_poses": self._poses_total}
 
-    def capture_pose(self, frame):
+    def capture_pose(self, get_frame):
         if self._active_name is None:
             return {"status": "error", "message": "No active enrollment"}
         if self._fail_next_capture:
