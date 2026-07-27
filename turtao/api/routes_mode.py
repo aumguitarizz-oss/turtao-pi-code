@@ -46,6 +46,12 @@ def mode():
         raise APIError(str(exc), "MODE_FAILURE", 500) from exc
 
     ser = _deps.get("serial")
+    if new_mode == "IDLE" and ser is not None:
+        try:
+            ser.write(json.dumps({"cmd": "move", "ml": 0.0, "mr": 0.0}) + "\n")
+        except Exception:
+            logger.exception("Failed to send stop command on IDLE transition")
+
     if ser is not None:
         try:
             ser.write(json.dumps({"cmd": "mode", "mode": new_mode}) + "\n")

@@ -68,3 +68,10 @@ class TestModeRoutes:
     def test_state_updated_on_post(self, client, mock_state):
         client.post("/api/mode", json={"mode": "PATROL"})
         assert mock_state.mode == "PATROL"
+
+    def test_switching_to_idle_sends_explicit_stop(self, client, mock_serial):
+        client.post("/api/mode", json={"mode": "PATROL"})
+        written_before = len(mock_serial.written)
+        client.post("/api/mode", json={"mode": "IDLE"})
+        new_payloads = [json.loads(w) for w in mock_serial.written[written_before:]]
+        assert {"cmd": "move", "ml": 0.0, "mr": 0.0} in new_payloads
