@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -257,6 +258,7 @@ class EnrollmentManager:
         # Option D: track how many outliers were discarded across all poses
         self._total_outliers_discarded: int = 0
         self._last_pose_outliers: int = 0
+        self._processing = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -321,6 +323,68 @@ class EnrollmentManager:
             self._pose_embeddings.append(r["embedding"])
 
         return self._finalize_pose()
+
+    def capture_pose_burst(self, frames: list[np.ndarray]) -> dict[str, Any]:
+        """
+        Process pre-supplied frames (e.g. uploaded from a phone) through the
+        same quality gate and pose-advancement logic as capture_pose, without
+        the live-camera burst delay — the frames already represent distinct
+        instants captured client-side.
+        """
+        if self._active_name is None:
+            return {"status": "error", "message": "No active enrollment"}
+
+        results = [self._process_single_frame(f) for f in frames]
+        good_frames = [r for r in results if r["ok"]]
+        bad_frames = [r for r in results if not r["ok"]]
+
+        logger.info(
+            "Upload burst for pose %d: %d/%d good frames",
+            self._current_pose + 1,
+            len(good_frames),
+            len(frames),
+        )
+
+        if len(good_frames) < MIN_QUALITY_FRAMES:
+            issues = [r.get("issue", "unknown") for r in bad_frames]
+            top_issue = max(set(issues), key=issues.count) if issues else "unknown"
+            self._last_quality_issue = top_issue
+            guidance_msg = QUALITY_GUIDANCE.get(top_issue, top_issue)
+            self._last_guidance = guidance_msg
+            return {
+                "status": "retry",
+                "message": f"Only {len(good_frames)}/{MIN_QUALITY_FRAMES} quality frames: {guidance_msg}",
+                "guidance": guidance_msg,
+                "pose": self._current_pose + 1,
+                "total_poses": REQUIRED_POSES,
+            }
+
+        for r in good_frames:
+            self._pose_frames.append(r["frame"])
+            self._pose_embeddings.append(r["embedding"])
+
+        return self._finalize_pose()
+
+    @property
+    def is_processing(self) -> bool:
+        return self._processing
+
+    def start_capture_burst(
+        self, frames: list[np.ndarray], on_complete: Any = None
+    ) -> None:
+        def _run() -> None:
+            self._processing = True
+            try:
+                result = self.capture_pose_burst(frames)
+                if result.get("status") == "complete" and on_complete is not None:
+                    on_complete()
+            except Exception:
+                logger.exception("capture_pose_burst worker failed")
+                self._last_quality_issue = "processing_error"
+            finally:
+                self._processing = False
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def cancel_enrollment(self) -> dict[str, Any]:
         if self._active_name is None:
