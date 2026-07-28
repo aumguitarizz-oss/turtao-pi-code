@@ -174,7 +174,10 @@ def enroll_capture_upload():
     for f in files:
         data = f.read()
         arr = np.frombuffer(data, dtype=np.uint8)
-        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        try:
+            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        except cv2.error:
+            frame = None
         if frame is None:
             raise APIError("Undecodable frame in upload", "VALIDATION_ERROR", 400)
         decoded.append(frame)

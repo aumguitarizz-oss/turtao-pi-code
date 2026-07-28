@@ -207,3 +207,28 @@ class TestFacesRoutes:
             "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
         )
         assert resp.status_code == 409
+
+    def test_capture_upload_empty_frame_returns_400(self, client, mock_enrollment):
+        import io
+        client.post("/api/faces/enroll/start", json={"name": "jack"})
+        data = {"frames": [(io.BytesIO(b""), "empty.jpg")]}
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 400
+
+    def test_capture_upload_one_bad_frame_among_good_ones_returns_400(self, client, mock_enrollment, tiny_jpeg_bytes):
+        import io
+        client.post("/api/faces/enroll/start", json={"name": "kate"})
+        data = {
+            "frames": [
+                (io.BytesIO(tiny_jpeg_bytes), "frame0.jpg"),
+                (io.BytesIO(tiny_jpeg_bytes), "frame1.jpg"),
+                (io.BytesIO(b""), "frame2.jpg"),
+                (io.BytesIO(tiny_jpeg_bytes), "frame3.jpg"),
+            ]
+        }
+        resp = client.post(
+            "/api/faces/enroll/capture_upload", data=data, content_type="multipart/form-data"
+        )
+        assert resp.status_code == 400
