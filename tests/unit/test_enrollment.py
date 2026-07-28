@@ -71,6 +71,7 @@ class TestStartCaptureBurst:
 
         with patch.object(manager, "_process_single_frame", side_effect=slow_process):
             assert manager.is_processing is False
+            manager.try_begin_processing()
             manager.start_capture_burst(frames)
             time.sleep(0.05)
             assert manager.is_processing is True
@@ -115,6 +116,7 @@ class TestStartCaptureBurst:
         frames = [np.zeros((100, 100, 3), dtype=np.uint8) for _ in range(5)]
 
         with patch.object(manager, "_process_single_frame", side_effect=RuntimeError("boom")):
+            manager.try_begin_processing()
             manager.start_capture_burst(frames)
             for _ in range(40):
                 if not manager.is_processing:
@@ -123,3 +125,11 @@ class TestStartCaptureBurst:
         assert manager.is_processing is False
         status = manager.get_status()
         assert status.get("quality_issue")
+
+
+class TestTryBeginProcessing:
+    def test_returns_true_once_then_false_until_released(self, manager):
+        assert manager.try_begin_processing() is True
+        assert manager.try_begin_processing() is False
+        manager.release_processing()
+        assert manager.try_begin_processing() is True

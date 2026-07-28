@@ -19,6 +19,8 @@ REQUIRED_FACE_ENGINE_METHODS = [
 
 REQUIRED_ENROLLMENT_METHODS = [
     "start_enrollment", "capture_pose", "cancel_enrollment", "get_status",
+    "is_processing", "start_capture_burst", "try_begin_processing",
+    "release_processing", "capture_pose_burst",
 ]
 
 REQUIRED_CAMERA_METHODS = ["read", "release", "get_latest_frame"]

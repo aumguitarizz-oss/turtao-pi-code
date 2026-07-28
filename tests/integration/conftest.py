@@ -110,10 +110,22 @@ class MockEnrollment:
     def is_processing(self):
         return self._processing_override
 
+    def try_begin_processing(self):
+        if self._processing_override:
+            return False
+        self._processing_override = True
+        return True
+
+    def release_processing(self):
+        self._processing_override = False
+
     def start_capture_burst(self, frames, on_complete=None):
-        result = self.capture_pose_burst(frames)
-        if result.get("status") == "complete" and on_complete is not None:
-            on_complete()
+        try:
+            result = self.capture_pose_burst(frames)
+            if result.get("status") == "complete" and on_complete is not None:
+                on_complete()
+        finally:
+            self.release_processing()
 
     def start_enrollment(self, name):
         self._active_name = name

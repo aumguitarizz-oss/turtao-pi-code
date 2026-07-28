@@ -136,10 +136,15 @@ def enroll_capture():
     if state is None or state.latest_frame is None:
         raise APIError("No camera frame available", "NO_FRAME", 503)
 
+    if not enroll.try_begin_processing():
+        raise APIError("Capture already in progress", "CAPTURE_IN_PROGRESS", 409)
+
     try:
         enroll.capture_pose(lambda: state.latest_frame)
     except Exception as exc:
         raise APIError(str(exc), "CAPTURE_FAILURE", 500) from exc
+    finally:
+        enroll.release_processing()
 
     status = _enrollment_status(enroll)
     if not status["active"]:
@@ -161,9 +166,6 @@ def enroll_capture_upload():
     if enroll.get_status().get("status") != "active":
         raise APIError("No active enrollment", "NO_ENROLLMENT", 409)
 
-    if enroll.is_processing:
-        raise APIError("Capture already in progress", "CAPTURE_IN_PROGRESS", 409)
-
     files = request.files.getlist("frames")
     if not files:
         raise APIError("frames field required", "VALIDATION_ERROR", 400)
@@ -181,6 +183,9 @@ def enroll_capture_upload():
         if frame is None:
             raise APIError("Undecodable frame in upload", "VALIDATION_ERROR", 400)
         decoded.append(frame)
+
+    if not enroll.try_begin_processing():
+        raise APIError("Capture already in progress", "CAPTURE_IN_PROGRESS", 409)
 
     engine = _deps.get("face_engine")
 

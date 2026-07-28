@@ -86,6 +86,13 @@ class TestFacesRoutes:
         assert resp.status_code == 409
         assert resp.get_json()["error"] == "NO_ENROLLMENT"
 
+    def test_enroll_capture_while_upload_processing_returns_409(self, client, mock_enrollment):
+        client.post("/api/faces/enroll/start", json={"name": "leo"})
+        mock_enrollment._processing_override = True
+        resp = client.post("/api/faces/enroll/capture")
+        assert resp.status_code == 409
+        assert resp.get_json()["error"] == "CAPTURE_IN_PROGRESS"
+
     def test_enroll_cancel(self, client, mock_enrollment):
         client.post("/api/faces/enroll/start", json={"name": "dave"})
         client.post("/api/faces/enroll/capture")

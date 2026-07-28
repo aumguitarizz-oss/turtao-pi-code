@@ -259,6 +259,7 @@ class EnrollmentManager:
         self._total_outliers_discarded: int = 0
         self._last_pose_outliers: int = 0
         self._processing = False
+        self._processing_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -369,11 +370,19 @@ class EnrollmentManager:
     def is_processing(self) -> bool:
         return self._processing
 
+    def try_begin_processing(self) -> bool:
+        with self._processing_lock:
+            if self._processing:
+                return False
+            self._processing = True
+            return True
+
+    def release_processing(self) -> None:
+        self._processing = False
+
     def start_capture_burst(
         self, frames: list[np.ndarray], on_complete: Any = None
     ) -> None:
-        self._processing = True
-
         def _run() -> None:
             try:
                 result = self.capture_pose_burst(frames)
@@ -383,7 +392,7 @@ class EnrollmentManager:
                 logger.exception("capture_pose_burst worker failed")
                 self._last_quality_issue = "processing_error"
             finally:
-                self._processing = False
+                self.release_processing()
 
         threading.Thread(target=_run, daemon=True).start()
 
