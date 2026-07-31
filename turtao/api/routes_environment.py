@@ -20,9 +20,9 @@ def get_environment():
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
     sd = st.sensor_data
     return {
-        "temp_c": sd.temp_c,
+        "temp_inside_c": sd.temp_inside_c,
+        "temp_outside_c": sd.temp_outside_c,
         "humidity_pct": sd.humidity_pct,
-        "pressure_hpa": sd.pressure_hpa,
         "gas_mq2": sd.gas_mq2,
         "air_quality_mq135": sd.air_quality_mq135,
         "sound_level": sd.sound_level,

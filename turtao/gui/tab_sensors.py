@@ -24,9 +24,9 @@ class SensorsTab:
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
         env_fields = [
-            ("Temperature", "temp_c", "°C"),
+            ("Inside Temp", "temp_inside_c", "°C"),
+            ("Outside Temp", "temp_outside_c", "°C"),
             ("Humidity", "humidity_pct", "%"),
-            ("Pressure", "pressure_hpa", "hPa"),
             ("Gas (MQ-2)", "gas_mq2", ""),
             ("Air Quality (MQ-135)", "air_quality_mq135", ""),
             ("Sound Level", "sound_level", ""),
@@ -88,9 +88,9 @@ class SensorsTab:
     def refresh(self) -> None:
         with self.core.state:
             s = self.core.state.sensor_data
-            self._set("temp_c", f"{s.temp_c:.1f}")
+            self._set("temp_inside_c", f"{s.temp_inside_c:.1f}")
+            self._set("temp_outside_c", f"{s.temp_outside_c:.1f}")
             self._set("humidity_pct", str(s.humidity_pct))
-            self._set("pressure_hpa", f"{s.pressure_hpa:.1f}")
             self._set("gas_mq2", str(s.gas_mq2))
             self._set("air_quality_mq135", str(s.air_quality_mq135))
             self._set("sound_level", f"{s.sound_level:.1f}")

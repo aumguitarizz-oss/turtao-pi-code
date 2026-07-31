@@ -3,9 +3,9 @@ import pytest
 
 class TestEnvironmentRoutes:
     def test_get_environment_returns_correct_schema(self, client, mock_state):
-        mock_state.sensor_data.temp_c = 25.5
+        mock_state.sensor_data.temp_inside_c = 31.0
+        mock_state.sensor_data.temp_outside_c = 25.5
         mock_state.sensor_data.humidity_pct = 60
-        mock_state.sensor_data.pressure_hpa = 1015.0
         mock_state.sensor_data.gas_mq2 = 150
         mock_state.sensor_data.air_quality_mq135 = 90
         mock_state.sensor_data.sound_level = 35.2
@@ -19,9 +19,10 @@ class TestEnvironmentRoutes:
         assert resp.status_code == 200
         data = resp.get_json()
 
-        assert data["temp_c"] == 25.5
+        assert data["temp_inside_c"] == 31.0
+        assert data["temp_outside_c"] == 25.5
         assert data["humidity_pct"] == 60
-        assert data["pressure_hpa"] == 1015.0
+        assert "pressure_hpa" not in data
         assert data["gas_mq2"] == 150
         assert data["air_quality_mq135"] == 90
         assert data["sound_level"] == 35.2
@@ -35,7 +36,8 @@ class TestEnvironmentRoutes:
         resp = client.get("/api/environment")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["temp_c"] == 0.0
+        assert data["temp_inside_c"] == 0.0
+        assert data["temp_outside_c"] == 0.0
         assert data["humidity_pct"] == 0
         assert data["motion"] is False
         assert data["tof_cm"] == [0, 0, 0, 0]

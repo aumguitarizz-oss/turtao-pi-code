@@ -49,9 +49,9 @@ class Orientation:
 
 @dataclass
 class SensorData:
-    temp_c: float = 0.0
+    temp_inside_c: float = 0.0
+    temp_outside_c: float = 0.0
     humidity_pct: int = 0
-    pressure_hpa: float = 0.0
     gas_mq2: int = 0
     air_quality_mq135: int = 0
     sound_level: float = 0.0

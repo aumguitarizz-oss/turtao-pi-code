@@ -14,7 +14,7 @@ class TestStateLockContention:
                     with app_state:
                         _ = app_state.mode
                         _ = app_state.heading
-                        _ = app_state.sensor_data.temp_c
+                        _ = app_state.sensor_data.temp_outside_c
                     time.sleep(0.001)
                 except Exception as e:
                     errors.append(e)
@@ -57,9 +57,9 @@ class TestStateLockContention:
             for i in range(100):
                 try:
                     with app_state:
-                        app_state.sensor_data.temp_c = float(i)
+                        app_state.sensor_data.temp_inside_c = float(i)
+                        app_state.sensor_data.temp_outside_c = float(i * 2)
                         app_state.sensor_data.humidity_pct = i
-                        app_state.sensor_data.pressure_hpa = float(i * 10)
                 except Exception as e:
                     errors.append(e)
 
@@ -67,12 +67,12 @@ class TestStateLockContention:
             for _ in range(100):
                 try:
                     with app_state:
-                        t = app_state.sensor_data.temp_c
+                        t_in = app_state.sensor_data.temp_inside_c
+                        t_out = app_state.sensor_data.temp_outside_c
                         h = app_state.sensor_data.humidity_pct
-                        p = app_state.sensor_data.pressure_hpa
-                    assert isinstance(t, float)
+                    assert isinstance(t_in, float)
+                    assert isinstance(t_out, float)
                     assert isinstance(h, int)
-                    assert isinstance(p, float)
                 except Exception as e:
                     errors.append(e)
 

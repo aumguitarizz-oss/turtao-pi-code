@@ -20,9 +20,9 @@ class BatteryResponse(BaseModel):
 
 
 class EnvironmentResponse(BaseModel):
-    temp_c: float
+    temp_inside_c: float
+    temp_outside_c: float
     humidity_pct: int
-    pressure_hpa: float
     gas_mq2: int
     air_quality_mq135: int
     sound_level: float
