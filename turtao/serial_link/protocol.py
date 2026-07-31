@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 logger = logging.getLogger(__name__)
 
 REQUIRED_SENSOR_FIELDS: set[str] = {
-    "temp_dht", "humidity_pct", "temp_bmp", "pressure_hpa",
+    "temp_inside_c", "temp_outside_c", "humidity_pct",
     "gas_mq2", "air_quality_mq135", "sound_level", "motion",
     "pitch", "roll", "yaw", "accel_x", "accel_y", "accel_z",
     "tof_fl", "tof_fc", "tof_fr", "tof_down",

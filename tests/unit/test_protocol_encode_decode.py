@@ -29,10 +29,9 @@ class TestEncodeCommand:
 class TestDecodePayload:
     def test_valid_json_round_trip(self):
         valid = {
-            "temp_dht": 28.5,
+            "temp_inside_c": 30.2,
             "humidity_pct": 65,
-            "temp_bmp": 28.1,
-            "pressure_hpa": 1013.2,
+            "temp_outside_c": 28.5,
             "gas_mq2": 120,
             "air_quality_mq135": 85,
             "sound_level": 42.3,
@@ -126,7 +125,7 @@ class TestValidatePayload:
 
     def test_missing_field_fails(self):
         payload = {field: None for field in REQUIRED_SENSOR_FIELDS}
-        del payload["temp_dht"]
+        del payload["temp_inside_c"]
         assert validate_payload(payload) is False
 
     def test_empty_dict_fails(self):
@@ -139,3 +138,34 @@ class TestValidatePayload:
         assert validate_payload("string") is False
         assert validate_payload(42) is False
         assert validate_payload([1, 2, 3]) is False
+
+
+class TestValidatePayloadRejectsOldFieldNames:
+    def test_rejects_payload_still_using_old_temp_bmp_and_pressure(self):
+        old_style = {
+            "temp_dht": 28.5,
+            "humidity_pct": 65,
+            "temp_bmp": 28.1,
+            "pressure_hpa": 1013.2,
+            "gas_mq2": 120,
+            "air_quality_mq135": 85,
+            "sound_level": 42.3,
+            "motion": False,
+            "pitch": 0.5,
+            "roll": -0.2,
+            "yaw": 1.1,
+            "accel_x": 0.01,
+            "accel_y": -0.02,
+            "accel_z": 9.81,
+            "tof_fl": 50,
+            "tof_fc": 120,
+            "tof_fr": 200,
+            "tof_down": 300,
+            "voltage": 12.4,
+            "current_ma": 150,
+            "battery_pct": 95.0,
+            "motor_controller_ok": True,
+            "firmware_version": "v2.1.0",
+            "ble_devices": [],
+        }
+        assert validate_payload(old_style) is False

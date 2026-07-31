@@ -165,9 +165,9 @@ class TurtaoCore:
     def _apply_sensor_data(self, data: dict[str, Any]) -> None:
         with self.state:
             s = self.state.sensor_data
-            s.temp_c = data.get("temp_dht", s.temp_c)
+            s.temp_inside_c = data.get("temp_inside_c", s.temp_inside_c)
+            s.temp_outside_c = data.get("temp_outside_c", s.temp_outside_c)
             s.humidity_pct = int(data.get("humidity_pct", s.humidity_pct))
-            s.pressure_hpa = data.get("pressure_hpa", s.pressure_hpa)
             s.gas_mq2 = data.get("gas_mq2", s.gas_mq2)
             s.air_quality_mq135 = data.get("air_quality_mq135", s.air_quality_mq135)
             s.sound_level = data.get("sound_level", s.sound_level)

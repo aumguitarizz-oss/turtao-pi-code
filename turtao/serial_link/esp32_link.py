@@ -127,9 +127,9 @@ class ESP32SerialLink(SerialLinkInterface):
                 sensor = self.poll_sensor()
                 if sensor is not None:
                     with self._state:
-                        self._state.sensor_data.temp_c = sensor.get("temp_dht", 0.0)
+                        self._state.sensor_data.temp_inside_c = sensor.get("temp_inside_c", 0.0)
+                        self._state.sensor_data.temp_outside_c = sensor.get("temp_outside_c", 0.0)
                         self._state.sensor_data.humidity_pct = int(sensor.get("humidity_pct", 0))
-                        self._state.sensor_data.pressure_hpa = sensor.get("pressure_hpa", 0.0)
                         self._state.sensor_data.gas_mq2 = sensor.get("gas_mq2", 0)
                         self._state.sensor_data.air_quality_mq135 = sensor.get("air_quality_mq135", 0)
                         self._state.sensor_data.sound_level = sensor.get("sound_level", 0.0)
