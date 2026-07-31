@@ -151,7 +151,7 @@ class UnknownsTab:
             result = self.core.enrollment.start_enrollment(name)
             if result.get("status") == "error":
                 return
-            self.core.enrollment.capture_pose(img)
+            self.core.enrollment.capture_pose(lambda: img)
             # Invalidate so the list rebuilds next poll
             self._last_state = frozenset()
         except Exception:

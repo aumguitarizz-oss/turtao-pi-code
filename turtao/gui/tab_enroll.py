@@ -143,7 +143,7 @@ class EnrollTab:
         self.capture_btn.configure(state=tk.DISABLED)
         self.frame.update_idletasks()
 
-        result = self.core.enrollment.capture_pose(frame)
+        result = self.core.enrollment.capture_pose(lambda: self.core.state.latest_frame)
         status = result.get("status", "")
         msg = result.get("message", "")
         guide = result.get("guidance", {})

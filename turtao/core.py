@@ -154,9 +154,12 @@ class TurtaoCore:
                 try:
                     line = self.serial.readline()
                     if line is not None:
-                        from turtao.serial_link.protocol import decode_payload
+                        from turtao.serial_link.protocol import (
+                            decode_payload,
+                            validate_payload,
+                        )
                         success, data = decode_payload(line)
-                        if success and "error" not in data:
+                        if success and "error" not in data and validate_payload(data):
                             self._apply_sensor_data(data)
                 except Exception:
                     logger.exception("Serial wrapper error")
