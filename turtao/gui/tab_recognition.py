@@ -32,6 +32,10 @@ class RecognitionTab:
         self.recog_btn.grid(row=row, column=0, pady=5)
         row += 1
 
+        self.recog_status_lbl = ttk.Label(container, font=("", 11, "bold"))
+        self.recog_status_lbl.grid(row=row, column=0, pady=(0, 10))
+        row += 1
+
         opt_frame = ttk.Frame(container)
         opt_frame.grid(row=row, column=0, pady=5)
 
@@ -62,6 +66,12 @@ class RecognitionTab:
         with self.core.state:
             current_mode = self.core.state.mode
         self.recog_var.set(current_mode == Mode.GUARD)
+        if current_mode == Mode.GUARD:
+            self.recog_status_lbl.configure(text="🟢 Recognition is ON", foreground="#1a7f37")
+        else:
+            self.recog_status_lbl.configure(
+                text="🔴 Recognition is OFF — enable GUARD Mode above", foreground="#c0392b"
+            )
         self._show_frame()
 
     def _show_frame(self) -> None:

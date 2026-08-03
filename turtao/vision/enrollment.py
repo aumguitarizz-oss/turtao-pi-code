@@ -23,29 +23,6 @@ LAPLACIAN_VARIANCE_MIN = 30
 BRIGHTNESS_MIN = 40
 BRIGHTNESS_MAX = 220
 
-# Option A: advanced preprocessing thresholds
-CLAHE_CLIP_LIMIT = 2.0       # CLAHE contrast limit
-CLAHE_TILE_GRID = (8, 8)     # CLAHE tile grid size
-DENOISE_H = 7                # Fast NL-Means denoising strength (lower = less aggressive)
-DENOISE_TEMPLATE = 7
-DENOISE_SEARCH = 21
-SHARPENING_ALPHA = 1.3       # Unsharp mask strength
-SHARPENING_SIGMA = 1.0
-
-# Option D: DBSCAN outlier rejection
-# eps: max L2 distance between two embeddings to be considered "neighbours".
-#
-# Calibrated empirically on 128-D L2-normalised face_recognition embeddings:
-#   - Same-person burst frames (minor head micro-movement):  L2 ≈ 0.65–0.90
-#   - Clearly bad/outlier frames (wrong angle, occlusion):   L2 ≈ 1.20–1.55
-#   - Random different-person vectors:                       L2 ≈ 1.40 (mean)
-#
-# eps=1.00 sits comfortably in the gap, clustering good frames together
-# and labelling genuinely bad frames as noise.
-DBSCAN_EPS = 1.00
-DBSCAN_MIN_SAMPLES = 2       # a core point needs ≥2 neighbours (inc. itself)
-DBSCAN_OUTLIER_LABEL = -1    # standard DBSCAN noise label
-
 FACE_DATA_DIR = Path("face_data")
 EMBEDDINGS_DIR = FACE_DATA_DIR / "embeddings"
 PROFILES_PATH = FACE_DATA_DIR / "profiles.json"
@@ -83,163 +60,8 @@ QUALITY_GUIDANCE: dict[str, str] = {
     "no_face":    "No face detected — make sure your face is visible",
     "multi_face": "Please have only one person in frame at a time",
     "embed_fail": "Could not compute embedding — please retry",
+    "no_frame":   "No camera frame available — please retry",
 }
-
-
-def preprocess_frame(frame: np.ndarray) -> np.ndarray:
-    """
-    Option A: Advanced image preprocessing pipeline.
-
-    Steps:
-    1. Denoise with Fast NL-Means (reduces sensor noise on cheap cameras)
-    2. Convert to LAB colour space and apply CLAHE on the L channel
-       (adaptive histogram equalisation — handles uneven lighting well)
-    3. Unsharp masking to recover edge detail lost by denoising
-    4. Clip to [0, 255] and convert back to BGR
-
-    This is meaningfully better than simple gamma / global contrast
-    because CLAHE is spatially adaptive — it won't blow out a bright
-    forehead when the rest of the face is in shadow.
-    """
-    # 1. Fast NL-Means denoising (BGR)
-    denoised = cv2.fastNlMeansDenoisingColored(
-        frame,
-        None,
-        DENOISE_H,
-        DENOISE_H,
-        DENOISE_TEMPLATE,
-        DENOISE_SEARCH,
-    )
-
-    # 2. CLAHE on L channel in LAB
-    lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
-    l_ch, a_ch, b_ch = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=CLAHE_CLIP_LIMIT, tileGridSize=CLAHE_TILE_GRID)
-    l_ch = clahe.apply(l_ch)
-    lab = cv2.merge([l_ch, a_ch, b_ch])
-    enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
-
-    # 3. Unsharp mask (sharpening)
-    blurred = cv2.GaussianBlur(enhanced, (0, 0), SHARPENING_SIGMA)
-    sharpened = cv2.addWeighted(enhanced, SHARPENING_ALPHA, blurred, -(SHARPENING_ALPHA - 1), 0)
-    sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
-
-    return sharpened
-
-
-# ---------------------------------------------------------------------------
-# Option D — pure-numpy DBSCAN implementation
-# ---------------------------------------------------------------------------
-
-def _dbscan_cluster(
-    embeddings: list[np.ndarray],
-    eps: float = DBSCAN_EPS,
-    min_samples: int = DBSCAN_MIN_SAMPLES,
-) -> np.ndarray:
-    """
-    Lightweight DBSCAN for 128-D face embeddings — no sklearn required.
-
-    Returns an integer label array of length len(embeddings):
-      ≥ 0  → cluster id (inlier)
-      -1   → noise / outlier
-
-    Why DBSCAN rather than k-means?
-    - We don't know k in advance (all embeddings might be one cluster, or
-      some might be isolated noise points).
-    - DBSCAN naturally labels outliers without forcing them into a cluster.
-    - It handles non-spherical clusters and is deterministic.
-
-    Complexity is O(n²) in distance calculations, but n ≤ FRAMES_PER_POSE
-    (currently 5) so this is trivially fast (<0.1 ms).
-    """
-    n = len(embeddings)
-    if n == 0:
-        return np.array([], dtype=int)
-
-    # Pre-compute pairwise L2 distance matrix
-    mat = np.stack(embeddings)                # shape (n, 128)
-    # ||a - b||² = ||a||² + ||b||² - 2·a·bᵀ
-    sq = np.sum(mat ** 2, axis=1, keepdims=True)   # (n, 1)
-    dist_sq = sq + sq.T - 2.0 * (mat @ mat.T)      # (n, n)
-    # Numerical safety: clamp tiny negatives to zero before sqrt
-    dist_sq = np.clip(dist_sq, 0.0, None)
-    dist = np.sqrt(dist_sq)                         # (n, n)
-
-    labels = np.full(n, DBSCAN_OUTLIER_LABEL, dtype=int)
-    cluster_id = 0
-    visited = np.zeros(n, dtype=bool)
-
-    def _region_query(idx: int) -> list[int]:
-        return [j for j in range(n) if dist[idx, j] <= eps]
-
-    def _expand_cluster(idx: int, neighbours: list[int], cid: int) -> None:
-        labels[idx] = cid
-        i = 0
-        while i < len(neighbours):
-            pt = neighbours[i]
-            if not visited[pt]:
-                visited[pt] = True
-                pt_neighbours = _region_query(pt)
-                if len(pt_neighbours) >= min_samples:
-                    neighbours += [q for q in pt_neighbours if q not in neighbours]
-            if labels[pt] == DBSCAN_OUTLIER_LABEL:
-                labels[pt] = cid
-            i += 1
-
-    for i in range(n):
-        if visited[i]:
-            continue
-        visited[i] = True
-        neighbours = _region_query(i)
-        if len(neighbours) < min_samples:
-            labels[i] = DBSCAN_OUTLIER_LABEL  # noise
-        else:
-            _expand_cluster(i, neighbours, cluster_id)
-            cluster_id += 1
-
-    return labels
-
-
-def _cluster_centroid(
-    embeddings: list[np.ndarray],
-    labels: np.ndarray,
-) -> tuple[np.ndarray, int]:
-    """
-    Option D: Given DBSCAN labels, pick the largest cluster, compute its
-    L2-normalised centroid, and return (centroid, n_outliers_discarded).
-
-    If every embedding is labelled as noise (all -1), falls back to a
-    simple mean of all embeddings so enrollment never completely fails.
-    """
-    unique_labels = [lbl for lbl in set(labels.tolist()) if lbl != DBSCAN_OUTLIER_LABEL]
-
-    if not unique_labels:
-        # All noise — fall back to simple mean
-        logger.warning(
-            "DBSCAN found no clusters; falling back to simple mean of all %d embeddings",
-            len(embeddings),
-        )
-        centroid = np.mean(embeddings, axis=0)
-        n_outliers = 0
-    else:
-        # Pick the largest cluster by member count
-        best_label = max(unique_labels, key=lambda lbl: int(np.sum(labels == lbl)))
-        inlier_mask = labels == best_label
-        inliers = [emb for emb, keep in zip(embeddings, inlier_mask) if keep]
-        n_outliers = int(np.sum(~inlier_mask))
-        centroid = np.mean(inliers, axis=0)
-        logger.info(
-            "DBSCAN: kept %d inliers, discarded %d outliers (cluster %d)",
-            len(inliers),
-            n_outliers,
-            best_label,
-        )
-
-    # L2 normalise for cosine-compatible comparison
-    norm = np.linalg.norm(centroid)
-    if norm > 1e-10:
-        centroid = centroid / norm
-    return centroid, n_outliers
 
 
 class EnrollmentManager:
@@ -448,13 +270,14 @@ class EnrollmentManager:
 
         return [self._process_single_frame(f) for f in frames_to_process]
 
-    def _process_single_frame(self, raw_frame: np.ndarray) -> dict[str, Any]:
-        """Option A: Preprocess + quality-gate + embed one frame."""
-        # Option A: preprocess
-        frame = preprocess_frame(raw_frame)
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    def _process_single_frame(self, raw_frame: np.ndarray | None) -> dict[str, Any]:
+        """Quality-gate + embed one frame directly (no preprocessing)."""
+        if raw_frame is None:
+            return {"ok": False, "issue": "no_frame", "frame": None, "embedding": None}
 
-        # Multi-face check (Option B guidance)
+        rgb = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2RGB)
+
+        # Multi-face check
         face_locs = face_recognition.face_locations(rgb, model="hog")
         if not face_locs:
             return {"ok": False, "issue": "no_face", "frame": raw_frame, "embedding": None}
@@ -462,7 +285,7 @@ class EnrollmentManager:
             return {"ok": False, "issue": "multi_face", "frame": raw_frame, "embedding": None}
 
         face_loc = face_locs[0]
-        quality_issue = self.check_quality(frame, face_loc)
+        quality_issue = self.check_quality(raw_frame, face_loc)
         if quality_issue is not None:
             return {"ok": False, "issue": quality_issue, "frame": raw_frame, "embedding": None}
 
@@ -487,30 +310,11 @@ class EnrollmentManager:
                 "total_poses": REQUIRED_POSES,
             }
 
-        # ----------------------------------------------------------------
-        # Option D: DBSCAN outlier rejection before computing centroid.
-        #
-        # Why this matters:
-        #   Even with quality gating (Options A+B+C), some embeddings may
-        #   still be slightly off — e.g. from a micro-movement during the
-        #   burst, partial hair occlusion, or a compression artefact.
-        #   A simple mean drags the centroid toward those noisy points.
-        #   DBSCAN finds the dense core cluster and ignores isolated
-        #   outliers, giving a centroid that better represents a clean
-        #   frontal capture.
-        # ----------------------------------------------------------------
-        labels = _dbscan_cluster(self._pose_embeddings)
-        centroid, n_outliers = _cluster_centroid(self._pose_embeddings, labels)
-
-        self._last_pose_outliers = n_outliers
-        self._total_outliers_discarded += n_outliers
-
-        if n_outliers > 0:
-            logger.info(
-                "Pose %d: DBSCAN removed %d outlier frame(s) before computing centroid",
-                self._current_pose + 1,
-                n_outliers,
-            )
+        # Average the good-frame embeddings for this pose — raw, unnormalised,
+        # matching the raw dlib encodings the recognition engine compares
+        # against at match time (shellalert's proven train.py does the same:
+        # "average embeddings for robustness across angles/lighting").
+        centroid = np.mean(self._pose_embeddings, axis=0)
 
         self._all_embeddings.append(self._pose_embeddings.copy())
         save_path = (
@@ -519,8 +323,9 @@ class EnrollmentManager:
         )
         np.save(str(save_path), centroid)
         logger.info(
-            "Saved pose %d centroid (DBSCAN) to %s",
+            "Saved pose %d embedding (mean of %d frames) to %s",
             self._current_pose + 1,
+            len(self._pose_embeddings),
             save_path,
         )
 
@@ -533,14 +338,13 @@ class EnrollmentManager:
 
         self._last_quality_issue = ""
         guide = self._current_pose_guide()
-        outlier_note = f" ({n_outliers} noisy frame(s) filtered out)" if n_outliers else ""
         return {
             "status": "next_pose",
-            "message": f"Pose {self._current_pose}/{REQUIRED_POSES} captured{outlier_note}",
+            "message": f"Pose {self._current_pose}/{REQUIRED_POSES} captured",
             "pose": self._current_pose + 1,
             "total_poses": REQUIRED_POSES,
             "guidance": guide,
-            "outliers_discarded": n_outliers,
+            "outliers_discarded": 0,
         }
 
     def _finish_enrollment(self) -> dict[str, Any]:
