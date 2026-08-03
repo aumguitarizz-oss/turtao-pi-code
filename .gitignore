@@ -4,6 +4,11 @@ __pycache__/
 .env
 venv/
 .venv/
+.DS_Store
+
+# Reference project (past working implementation, not part of this app):
+# contains its own venvs and another person's enrolled face photos.
+shellalert/
 
 # Face data — embeddings and profiles contain personal biometric data
 face_data/embeddings/
