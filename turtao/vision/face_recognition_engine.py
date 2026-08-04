@@ -12,6 +12,7 @@ import face_recognition
 import numpy as np
 
 from turtao.state import AppState, ThreatLabel
+from turtao.vision.dlib_lock import DLIB_LOCK
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +187,8 @@ class FaceRecognitionEngine:
             raise ValueError(f"Face '{name}' already exists")
         frame = cv2.imread(str(src))
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        encodings = face_recognition.face_encodings(rgb)
+        with DLIB_LOCK:
+            encodings = face_recognition.face_encodings(rgb)
         if not encodings:
             raise ValueError("No face detected in unknown crop")
         np.save(str(self._embeddings_dir / f"{name}_000.npy"), encodings[0])
@@ -201,8 +203,11 @@ class FaceRecognitionEngine:
         # versus the simple, proven approach.
         small = cv2.resize(frame, (0, 0), fx=RESIZE_SCALE, fy=RESIZE_SCALE)
         rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(rgb_small, model="hog")
-        face_encodings = face_recognition.face_encodings(rgb_small, face_locations)
+        # dlib's detector is not safe to call concurrently with enrollment's
+        # own dlib calls on another thread — see dlib_lock.py.
+        with DLIB_LOCK:
+            face_locations = face_recognition.face_locations(rgb_small, model="hog")
+            face_encodings = face_recognition.face_encodings(rgb_small, face_locations)
 
         if not face_locations:
             with self._state:

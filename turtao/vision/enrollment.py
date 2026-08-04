@@ -11,6 +11,8 @@ import cv2
 import face_recognition
 import numpy as np
 
+from turtao.vision.dlib_lock import DLIB_LOCK
+
 logger = logging.getLogger(__name__)
 
 REQUIRED_POSES = 5
@@ -277,8 +279,13 @@ class EnrollmentManager:
 
         rgb = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2RGB)
 
+        # dlib's detector is not safe to call concurrently with the
+        # recognition engine's own dlib calls on another thread — see
+        # dlib_lock.py.
+        with DLIB_LOCK:
+            face_locs = face_recognition.face_locations(rgb, model="hog")
+
         # Multi-face check
-        face_locs = face_recognition.face_locations(rgb, model="hog")
         if not face_locs:
             return {"ok": False, "issue": "no_face", "frame": raw_frame, "embedding": None}
         if len(face_locs) > 1:
@@ -289,7 +296,8 @@ class EnrollmentManager:
         if quality_issue is not None:
             return {"ok": False, "issue": quality_issue, "frame": raw_frame, "embedding": None}
 
-        encodings = face_recognition.face_encodings(rgb, [face_loc])
+        with DLIB_LOCK:
+            encodings = face_recognition.face_encodings(rgb, [face_loc])
         if not encodings:
             return {"ok": False, "issue": "embed_fail", "frame": raw_frame, "embedding": None}
 
