@@ -102,7 +102,7 @@ class AppState:
         self.latest_persons: list[dict[str, Any]] = []
         self.show_yolo: bool = True
         self.show_mediapipe: bool = False
-        self.pose_landmarks: list[tuple[int, int]] = []
+        self.pose_landmarks: list[list[tuple[int, int]]] = []  # one list per detected person
         self.frame_queue: deque = deque(maxlen=2)
         self.events: deque[Event] = deque(maxlen=50)
         self.event_counter: int = 0
