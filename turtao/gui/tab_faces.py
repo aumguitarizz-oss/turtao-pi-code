@@ -1,3 +1,4 @@
+import contextlib
 import json
 import tkinter as tk
 from pathlib import Path
@@ -123,12 +124,5 @@ class FacesTab:
         return ImageTk.PhotoImage(img)
 
     def _delete_face(self, name: str) -> None:
-        try:
-            profiles_path = Path("face_data/profiles.json")
-            if not profiles_path.exists():
-                return
-            profiles = json.loads(profiles_path.read_text())
-            profiles = [p for p in profiles if p.get("name") != name]
-            profiles_path.write_text(json.dumps(profiles, indent=2))
-        except (json.JSONDecodeError, OSError):
-            pass
+        with contextlib.suppress(ValueError):
+            self.core.face_engine.delete_face(name)
