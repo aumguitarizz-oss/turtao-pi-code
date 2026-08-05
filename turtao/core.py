@@ -156,7 +156,12 @@ class TurtaoCore:
     def _loiter_tick(self, now: float) -> None:
         with self.state:
             persons = list(self.state.latest_persons)
-            pose_present = bool(self.state.pose_landmarks)
+            # MediaPipe is not used as a presence-confirmation gate: it's
+            # unreliable to install/run on Pi hardware, so YOLO's person
+            # tracking alone confirms presence here. If pose_landmarks is
+            # ever populated (mediapipe working on some deployment), this
+            # still degrades gracefully since it's unconditionally True.
+            pose_present = True
             faces = list(self.state.threat_state.faces)
             frame = self.state.latest_frame
 

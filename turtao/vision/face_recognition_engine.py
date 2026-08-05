@@ -75,6 +75,7 @@ class FaceRecognitionEngine:
         self._last_unknown_save = 0.0
         self._last_tts_threat = 0.0
         self._frames_since_seen = 0
+        self._last_logged_face_count = -1
 
     def load_embeddings(self, profile_dir: str) -> None:
         path = Path(profile_dir)
@@ -208,6 +209,13 @@ class FaceRecognitionEngine:
         with DLIB_LOCK:
             face_locations = face_recognition.face_locations(rgb_small, model="hog")
             face_encodings = face_recognition.face_encodings(rgb_small, face_locations)
+
+        if len(face_locations) != self._last_logged_face_count:
+            logger.debug(
+                "DIAGNOSTIC: HOG detected %d face(s) this frame (was %d)",
+                len(face_locations), self._last_logged_face_count,
+            )
+            self._last_logged_face_count = len(face_locations)
 
         if not face_locations:
             with self._state:
