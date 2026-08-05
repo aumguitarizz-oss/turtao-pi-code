@@ -63,6 +63,12 @@ def camera_capture_loop(state: AppState, camera: CameraInterface) -> None:
             state.frame_counter += 1
             frame_count = state.frame_counter
 
+        if frame_count == 1 or frame_count % 100 == 0:
+            logger.info(
+                "DIAGNOSTIC: camera_capture_loop frame #%d captured, shape=%s",
+                frame_count, getattr(frame, "shape", None),
+            )
+
         if frame_count % BRIGHTNESS_INTERVAL == 0:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             mean_brightness = np.mean(gray)

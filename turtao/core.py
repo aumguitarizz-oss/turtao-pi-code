@@ -107,10 +107,19 @@ class TurtaoCore:
 
     def _face_recognition_wrapper(self) -> None:
         """Wrap face_recognition_loop with IDLE-mode skipping."""
+        last_logged = (None, None)
         while not self.state.stop_event.is_set():
             with self.state:
                 mode = self.state.mode
                 frame = self.state.frame_queue[-1] if self.state.frame_queue else None
+
+            state_key = (mode, frame is not None)
+            if state_key != last_logged:
+                logger.info(
+                    "DIAGNOSTIC: face_recognition_wrapper mode=%s frame_available=%s",
+                    mode, frame is not None,
+                )
+                last_logged = state_key
 
             if mode == Mode.IDLE:
                 with self.state:
