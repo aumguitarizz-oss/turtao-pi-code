@@ -288,3 +288,74 @@ class TestUnknowns:
             engine.promote_unknown("unknown_20260101_120000", "grace")
         profiles = engine._read_profiles()
         assert any(p.get("name") == "grace" for p in profiles)
+
+
+class TestMultiFaceRecognition:
+    @patch("turtao.vision.face_recognition_engine.face_recognition")
+    @patch("turtao.vision.face_recognition_engine.cv2")
+    def test_two_known_faces_both_appear_in_faces_list(
+        self, mock_cv2, mock_fr, app_state: AppState
+    ):
+        mock_fr.face_locations.return_value = [(100, 200, 300, 50), (100, 500, 300, 350)]
+        alice_encoding = np.array([1.0, 0.0, 0.0, 0.0])
+        bob_encoding = np.array([0.0, 1.0, 0.0, 0.0])
+        mock_fr.face_encodings.return_value = [alice_encoding, bob_encoding]
+        mock_cv2.resize.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+        mock_cv2.cvtColor.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        engine = FaceRecognitionEngine(app_state, tolerance=0.1)
+        engine._known_embeddings = [alice_encoding, bob_encoding]
+        engine._known_names = ["alice", "bob"]
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        engine.process_frame(frame)
+
+        faces = app_state.threat_state.faces
+        assert len(faces) == 2
+        names = {f.name for f in faces}
+        assert names == {"alice", "bob"}
+        assert all(f.label == ThreatLabel.SAFE for f in faces)
+        assert app_state.threat_label == ThreatLabel.SAFE
+
+    @patch("turtao.vision.face_recognition_engine.face_recognition")
+    @patch("turtao.vision.face_recognition_engine.cv2")
+    def test_one_known_one_unknown_summary_is_threat(
+        self, mock_cv2, mock_fr, app_state: AppState
+    ):
+        mock_fr.face_locations.return_value = [(100, 200, 300, 50), (100, 500, 300, 350)]
+        alice_encoding = np.array([1.0, 0.0, 0.0, 0.0])
+        stranger_encoding = np.array([0.0, 0.0, 1.0, 0.0])
+        mock_fr.face_encodings.return_value = [alice_encoding, stranger_encoding]
+        mock_cv2.resize.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+        mock_cv2.cvtColor.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        engine = FaceRecognitionEngine(app_state, tolerance=0.1)
+        engine._known_embeddings = [alice_encoding]
+        engine._known_names = ["alice"]
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        engine.process_frame(frame)
+
+        faces = app_state.threat_state.faces
+        assert len(faces) == 2
+        labels = {f.name: f.label for f in faces}
+        assert labels["alice"] == ThreatLabel.SAFE
+        assert any(v == ThreatLabel.THREAT for k, v in labels.items() if k != "alice")
+        # Global summary must be THREAT (any-unresolved-face wins)
+        assert app_state.threat_label == ThreatLabel.THREAT
+        assert app_state.threat_state.name != "alice"
+
+    @patch("turtao.vision.face_recognition_engine.face_recognition")
+    @patch("turtao.vision.face_recognition_engine.cv2")
+    def test_no_faces_clears_faces_list(
+        self, mock_cv2, mock_fr, app_state: AppState
+    ):
+        mock_fr.face_locations.return_value = []
+        mock_fr.face_encodings.return_value = []
+        mock_cv2.resize.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+        mock_cv2.cvtColor.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        engine = FaceRecognitionEngine(app_state)
+        engine._frames_since_seen = 10  # force the IDLE-reset branch immediately
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        engine.process_frame(frame)
+
+        assert app_state.threat_state.faces == []

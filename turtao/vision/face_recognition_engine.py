@@ -11,7 +11,7 @@ import cv2
 import face_recognition
 import numpy as np
 
-from turtao.state import AppState, ThreatLabel
+from turtao.state import AppState, FaceDetection, ThreatLabel
 from turtao.vision.dlib_lock import DLIB_LOCK
 
 logger = logging.getLogger(__name__)
@@ -218,12 +218,10 @@ class FaceRecognitionEngine:
                     self._state.threat_state.landmarks = []
                     self._state.threat_state.name = ""
                     self._state.threat_state.active = False
+                    self._state.threat_state.faces = []
             return
 
-        match_label = ThreatLabel.THREAT
-        name = "Unknown"
-        box: tuple[int, int, int, int] | None = None
-        confidence = 0.0
+        faces: list[FaceDetection] = []
 
         for i, encoding in enumerate(face_encodings):
             top, right, bottom, left = face_locations[i]
@@ -232,6 +230,7 @@ class FaceRecognitionEngine:
             top = int(top / RESIZE_SCALE)
             right = int(right / RESIZE_SCALE)
             bottom = int(bottom / RESIZE_SCALE)
+            box = (left, top, right, bottom)
 
             # Check against known enrolled profiles
             if self._known_embeddings:
@@ -243,13 +242,13 @@ class FaceRecognitionEngine:
                 min_dist = distances[min_idx]
 
                 if min_dist <= self._tolerance:
-                    match_label = ThreatLabel.SAFE
-                    confidence = 1.0 - min_dist
-                    box = (left, top, right, bottom)
                     # _known_names already holds pose-suffix-stripped names
                     # (see load_embeddings).
-                    name = self._known_names[min_idx]
-                    break
+                    faces.append(FaceDetection(
+                        box=box, name=self._known_names[min_idx],
+                        label=ThreatLabel.SAFE, confidence=1.0 - min_dist,
+                    ))
+                    continue
 
             # Check session unknowns
             if self._unknown_embeddings:
@@ -261,28 +260,32 @@ class FaceRecognitionEngine:
                 min_u_dist = u_distances[min_u_idx]
 
                 if min_u_dist <= self._tolerance:
-                    match_label = ThreatLabel.THREAT
-                    confidence = 1.0 - min_u_dist
-                    box = (left, top, right, bottom)
-                    name = self._unknown_names[min_u_idx]
-                    break
+                    faces.append(FaceDetection(
+                        box=box, name=self._unknown_names[min_u_idx],
+                        label=ThreatLabel.THREAT, confidence=1.0 - min_u_dist,
+                    ))
+                    continue
 
             # Completely new unknown face
             new_id = len(self._unknown_embeddings) + 1
             new_name = f"Unknown {new_id}"
             self._unknown_embeddings.append(encoding)
             self._unknown_names.append(new_name)
+            faces.append(FaceDetection(
+                box=box, name=new_name, label=ThreatLabel.THREAT, confidence=0.0,
+            ))
 
-            match_label = ThreatLabel.THREAT
-            confidence = 0.0
-            box = (left, top, right, bottom)
-            name = new_name
-            break
+        # Summary = worst-case face this frame: any THREAT beats any SAFE,
+        # first-found among ties. There's always >=1 face here since we
+        # returned early above when face_locations was empty.
+        threat_faces = [f for f in faces if f.label == ThreatLabel.THREAT]
+        summary = threat_faces[0] if threat_faces else faces[0]
+        match_label = summary.label
 
-        if match_label == ThreatLabel.THREAT:
+        if threat_faces:
             now = time.time()
             if now - self._last_unknown_save >= UNKNOWN_SAVE_INTERVAL:
-                self._save_unknown(frame, box)
+                self._save_unknown(frame, threat_faces[0].box)
                 self._last_unknown_save = now
             if now - self._last_tts_threat >= TTS_DEBOUNCE_INTERVAL:
                 logger.info("TTS trigger: unknown face detected")
@@ -290,11 +293,11 @@ class FaceRecognitionEngine:
 
         with self._state:
             self._frames_since_seen = 0
-            self._update_threat_state(box, confidence, [], name)
+            self._update_threat_state(summary.box, summary.confidence, [], summary.name, faces)
             self._state.threat_label = match_label
 
-            if match_label == ThreatLabel.THREAT and box is not None:
-                pan, tilt = _calculate_aim(*box)
+            if match_label == ThreatLabel.THREAT:
+                pan, tilt = _calculate_aim(*summary.box)
                 self._state.pan = pan
                 self._state.tilt = tilt
 
@@ -304,6 +307,7 @@ class FaceRecognitionEngine:
         confidence: float,
         landmarks: list[tuple[int, int]],
         name: str,
+        faces: list[FaceDetection],
     ) -> None:
         self._state.threat_state.active = True
         self._state.threat_state.confidence = confidence
@@ -311,6 +315,7 @@ class FaceRecognitionEngine:
         self._state.threat_state.box = box
         self._state.threat_state.landmarks = landmarks
         self._state.threat_state.name = name
+        self._state.threat_state.faces = faces
 
     @staticmethod
     def _save_unknown(frame: np.ndarray, box: tuple[int, int, int, int] | None) -> None:
