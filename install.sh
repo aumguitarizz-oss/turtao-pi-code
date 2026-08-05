@@ -82,6 +82,13 @@ shutil.move('yolov8n.onnx', '$MODELS_DIR/yolov8n.onnx')
 "
 fi
 
+# ── MediaPipe pose landmarker ──────────────────────────────────────
+if [ ! -f "$MODELS_DIR/pose_landmarker_lite.task" ]; then
+    echo ">>> Downloading MediaPipe pose landmarker model..."
+    wget -q "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
+        -O "$MODELS_DIR/pose_landmarker_lite.task"
+fi
+
 # ── Piper TTS download (ARM64) ──────────────────────────────────────
 echo ">>> Downloading Piper TTS (ARM64)..."
 mkdir -p "$PIPER_DIR"
