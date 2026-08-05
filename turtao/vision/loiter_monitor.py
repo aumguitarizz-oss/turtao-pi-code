@@ -16,7 +16,6 @@ PERSON_ABSENT_GRACE_PERIOD = 1.0      # seconds
 class _PersonTimer:
     first_missing_at: float | None = None
     last_seen_at: float = 0.0
-    last_bbox: tuple[int, int, int, int] | None = None
     recorded: bool = False
     alerted: bool = False
 
@@ -54,13 +53,12 @@ class LoiterMonitor:
             seen_ids.add(tracker_id)
             timer = self._timers.setdefault(tracker_id, _PersonTimer())
             timer.last_seen_at = now
-            timer.last_bbox = bbox
 
             if not pose_present:
                 continue
 
             if self._face_overlaps(bbox, faces):
-                timer.first_missing_at = now
+                timer.first_missing_at = None
                 timer.recorded = False
                 timer.alerted = False
                 continue
@@ -77,24 +75,6 @@ class LoiterMonitor:
             if missing_for >= FACE_MISSING_ALERT_THRESHOLD and not timer.alerted:
                 emit_alert(
                     f"Unrecognized person (tracker #{tracker_id}) unresolved "
-                    f"for {FACE_MISSING_ALERT_THRESHOLD:.0f}s+"
-                )
-                timer.alerted = True
-
-        # Check recording/alert for timers of persons not in current frame
-        for tid, timer in self._timers.items():
-            if tid in seen_ids or timer.first_missing_at is None or not pose_present:
-                continue
-            missing_for = now - timer.first_missing_at
-
-            if missing_for >= FACE_MISSING_RECORD_THRESHOLD and not timer.recorded:
-                if frame is not None and timer.last_bbox is not None:
-                    record_crop(frame, timer.last_bbox)
-                timer.recorded = True
-
-            if missing_for >= FACE_MISSING_ALERT_THRESHOLD and not timer.alerted:
-                emit_alert(
-                    f"Unrecognized person (tracker #{tid}) unresolved "
                     f"for {FACE_MISSING_ALERT_THRESHOLD:.0f}s+"
                 )
                 timer.alerted = True

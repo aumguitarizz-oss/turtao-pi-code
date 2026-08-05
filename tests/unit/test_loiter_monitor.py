@@ -1,5 +1,5 @@
 import numpy as np
-import pytest
+
 from turtao.state import FaceDetection, ThreatLabel
 from turtao.vision.loiter_monitor import LoiterMonitor
 
@@ -14,7 +14,12 @@ def _face_in(bbox, name="alice"):
     face_bottom = y1 + (y2 - y1) // 3
     cx = (x1 + x2) // 2
     cy = (face_top + face_bottom) // 2
-    return FaceDetection(box=(cx - 10, cy - 10, cx + 10, cy + 10), name=name, label=ThreatLabel.SAFE, confidence=0.9)
+    return FaceDetection(
+        box=(cx - 10, cy - 10, cx + 10, cy + 10),
+        name=name,
+        label=ThreatLabel.SAFE,
+        confidence=0.9,
+    )
 
 
 class TestLoiterMonitor:
@@ -68,11 +73,14 @@ class TestLoiterMonitor:
         # Face resolves before the 0.5s record threshold
         monitor.update([person], True, [_face_in(person["bbox"])], frame, now=100.2,
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
-        # Now missing again for another 0.6s — should re-trigger record, not
-        # be treated as continuously missing since 100.0
+        # Now missing again from 100.8; still no record yet (0s elapsed in new episode)
         monitor.update([person], True, [], frame, now=100.8,
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
+        assert recorded == []  # still no record yet, only 0s have passed in the new episode
 
+        # Now advance 0.5s past the new missing start (100.8), so record fires
+        monitor.update([person], True, [], frame, now=101.3,
+                        record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
         assert recorded == [person["bbox"]]  # fired once, from the second missing episode
         assert alerted == []  # never reached 2s of *continuous* missing
 
@@ -84,17 +92,20 @@ class TestLoiterMonitor:
 
         monitor.update([person], True, [], frame, now=100.0,
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
-        # Person gone; > 1.0s grace period passes
+        # Person gone before ever reaching the 0.5s record threshold; > 1.0s
+        # grace period passes, so the timer is dropped with no record fired.
         monitor.update([], True, [], frame, now=101.5,
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
+        assert recorded == []
+
         # Same tracker_id reappears — must behave like a fresh episode, not
-        # inherit the old first_missing_at
+        # inherit the old (now-dropped) first_missing_at.
         monitor.update([person], True, [], frame, now=200.0,
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
-        assert len(recorded) == 1  # only from the very first episode so far
+        assert recorded == []  # still 0s elapsed in the fresh episode
         monitor.update([person], True, [], frame, now=200.5,
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
-        assert len(recorded) == 2  # second episode's own 0.5s record fired
+        assert len(recorded) == 1  # the fresh episode's own 0.5s record fired
 
     def test_non_person_class_ignored(self):
         monitor = LoiterMonitor()
