@@ -50,6 +50,34 @@ class TestStatusBroadcaster:
         assert data["tof"]["fr"] == 0
         assert data["latency_ms"] == 0
 
+    def test_build_status_normalizes_box_against_real_frame(self, mock_state):
+        import numpy as np
+
+        mock_state.latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        mock_state.threat_state.box = (64, 96, 192, 288)  # left, top, right, bottom
+        mock_state.threat_state.name = "alice"
+
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+
+        assert payload["data"]["threat"]["box"] == [0.1, 0.2, 0.2, 0.4]
+        assert payload["data"]["threat"]["name"] == "alice"
+
+    def test_build_status_box_none_when_no_box(self, mock_state):
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+        assert payload["data"]["threat"]["box"] is None
+        assert payload["data"]["threat"]["name"] is None
+
+    def test_build_status_box_none_when_frame_has_no_shape(self, mock_state):
+        mock_state.threat_state.box = (64, 96, 192, 288)
+        mock_state.latest_frame = "fake_frame"  # no .shape attribute
+
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+
+        assert payload["data"]["threat"]["box"] is None
+
     def test_add_and_remove_client(self, mock_state):
         broadcaster = StatusBroadcaster(mock_state)
         mock_ws = object()

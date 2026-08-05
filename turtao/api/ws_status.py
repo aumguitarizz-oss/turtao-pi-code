@@ -53,6 +53,8 @@ class StatusBroadcaster:
                     "face_crop": ts.face_crop if isinstance(ts.face_crop, str) else None,
                     "confidence": ts.confidence,
                     "timestamp": ts.timestamp,
+                    "box": self._normalized_box(),
+                    "name": ts.name or None,
                 },
                 "mode": st.mode.value if isinstance(st.mode, Mode) else st.mode,
                 "battery": {
@@ -70,6 +72,24 @@ class StatusBroadcaster:
                 "latency_ms": st.latency_ms,
             },
         }
+
+    def _normalized_box(self) -> list[float] | None:
+        """The current summary face's box as [left, top, width, height],
+        normalised 0..1 against the live frame's actual dimensions —
+        matches the app's Rect.fromLTWH(...) contract directly, so the
+        app never needs to know the camera's real pixel resolution."""
+        box = self._state.threat_state.box
+        frame = self._state.latest_frame
+        if box is None or frame is None:
+            return None
+        try:
+            h, w = frame.shape[:2]
+        except (AttributeError, ValueError):
+            return None
+        if w <= 0 or h <= 0:
+            return None
+        left, top, right, bottom = box
+        return [left / w, top / h, (right - left) / w, (bottom - top) / h]
 
 
 _broadcaster: StatusBroadcaster | None = None

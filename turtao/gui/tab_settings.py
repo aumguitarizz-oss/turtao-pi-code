@@ -23,7 +23,6 @@ class SettingsTab:
         toggles_frame.pack(fill=tk.X, pady=5)
 
         bool_fields = [
-            ("BLE Proximity", "ble_proximity_enabled", "ble_proximity_enabled"),
             ("Anti-Spoof", "anti_spoof_enabled", "anti_spoof_enabled"),
             ("Safe Mode", "safe_mode", "safe_mode"),
             ("Auto Flashbang", "auto_flashbang", "auto_flashbang"),
