@@ -22,6 +22,14 @@ class ThreatLabel(str, Enum):
 
 
 @dataclass
+class FaceDetection:
+    box: tuple[int, int, int, int]
+    name: str
+    label: ThreatLabel
+    confidence: float
+
+
+@dataclass
 class BatteryData:
     voltage: float = 0.0
     current_ma: int = 0
@@ -38,6 +46,7 @@ class ThreatState:
     box: tuple[int, int, int, int] | None = None
     landmarks: list[tuple[int, int]] = field(default_factory=list)
     name: str = ""
+    faces: list[FaceDetection] = field(default_factory=list)
 
 
 @dataclass
