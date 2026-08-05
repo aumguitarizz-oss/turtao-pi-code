@@ -25,6 +25,12 @@ from turtao.vision.pose_tracker import PoseTracker
 
 logger = logging.getLogger(__name__)
 
+# Mirrors face_recognition_engine.py's UNKNOWN_SAVE_INTERVAL: throttle how
+# often a loiter crop is written to disk, since ByteTrack can reassign
+# tracker IDs on occlusion/re-entry, which would otherwise defeat
+# LoiterMonitor's per-tracker_id one-shot guard and produce unbounded writes.
+LOITER_CROP_MIN_INTERVAL = 2.0
+
 class TurtaoCore:
     """Central orchestrator.
 
@@ -63,6 +69,7 @@ class TurtaoCore:
 
         self._threads: list[threading.Thread] = []
         self._start_time: float = 0.0
+        self._last_loiter_crop_save: float = 0.0
 
     def start(self) -> None:
         """Open hardware connections, start all 8 daemon threads."""
@@ -168,6 +175,10 @@ class TurtaoCore:
     ) -> None:
         import cv2
 
+        now = time.time()
+        if now - self._last_loiter_crop_save < LOITER_CROP_MIN_INTERVAL:
+            return
+
         try:
             x1, y1, x2, y2 = bbox
             crop = frame[max(0, y1):y2, max(0, x1):x2]
@@ -175,9 +186,12 @@ class TurtaoCore:
                 return
             unknown_dir = Path("face_data/unknowns")
             unknown_dir.mkdir(parents=True, exist_ok=True)
-            ts = time.strftime("%Y%m%d_%H%M%S")
-            cv2.imwrite(str(unknown_dir / f"unknown_{ts}.jpg"), crop)
-            logger.info("Loiter: saved unrecognized person crop to unknowns/%s.jpg", ts)
+            ts = time.strftime("%Y%m%d_%H%M%S", time.localtime(now))
+            ms = int((now % 1) * 1000)
+            fname = f"unknown_{ts}_{ms:03d}.jpg"
+            cv2.imwrite(str(unknown_dir / fname), crop)
+            self._last_loiter_crop_save = now
+            logger.info("Loiter: saved unrecognized person crop to unknowns/%s", fname)
         except Exception:
             logger.exception("Loiter: failed to save crop")
 

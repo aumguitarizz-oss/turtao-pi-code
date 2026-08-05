@@ -57,7 +57,7 @@ def events():
 
     return [
         {"id": e.id, "type": e.type, "message": e.message, "at": e.at}
-        for e in st.events
+        for e in reversed(st.events)
     ]
 
 

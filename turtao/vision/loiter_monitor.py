@@ -55,6 +55,14 @@ class LoiterMonitor:
             timer.last_seen_at = now
 
             if not pose_present:
+                # Presence tracking (pose) was lost, e.g. a GUARD -> IDLE ->
+                # GUARD mode toggle. Reset the episode (same reset used when
+                # a face resolves) so stale wall-clock time isn't blamed
+                # once presence is reconfirmed later, which would otherwise
+                # fire an instant false alert with zero actual dwell time.
+                timer.first_missing_at = None
+                timer.recorded = False
+                timer.alerted = False
                 continue
 
             if self._face_overlaps(bbox, faces):

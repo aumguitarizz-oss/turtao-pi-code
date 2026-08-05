@@ -107,6 +107,39 @@ class TestLoiterMonitor:
                         record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
         assert len(recorded) == 1  # the fresh episode's own 0.5s record fired
 
+    def test_pose_lost_then_regained_clears_stale_timer(self):
+        """Regression test: a mode toggle (GUARD -> IDLE -> GUARD) must not
+        let wall-clock time accrued while pose tracking was off be blamed
+        against the missing-face timer once pose presence returns. Without
+        the fix, this sequence fires an instant alert with 0s of actual
+        dwell time in the reconfirmed episode."""
+        monitor = LoiterMonitor()
+        recorded, alerted = [], []
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        person = _person()
+
+        # Episode starts: pose present, face missing.
+        monitor.update([person], True, [], frame, now=100.0,
+                        record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
+        assert recorded == []
+        assert alerted == []
+
+        # Mode toggles to IDLE: pose_present goes False for a long gap. If
+        # first_missing_at were left stale, elapsed time would blow past
+        # both thresholds the instant pose_present flips back to True.
+        monitor.update([person], False, [], frame, now=500.0,
+                        record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
+        assert recorded == []
+        assert alerted == []
+
+        # Mode toggles back to GUARD: pose present again, face still
+        # missing, but only a fresh (short) amount of time has passed in
+        # the reconfirmed episode — no instant false alert should fire.
+        monitor.update([person], True, [], frame, now=500.1,
+                        record_crop=lambda f, b: recorded.append(b), emit_alert=alerted.append)
+        assert recorded == []
+        assert alerted == []
+
     def test_non_person_class_ignored(self):
         monitor = LoiterMonitor()
         recorded, alerted = [], []
