@@ -51,6 +51,21 @@ class SettingsTab:
             ("Connection Lost", "notif_connection"),
         ]
 
+        audio_frame = ttk.LabelFrame(main, text="Audio")
+        audio_frame.pack(fill=tk.X, pady=5)
+
+        audio_row = ttk.Frame(audio_frame)
+        audio_row.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(
+            audio_row, text="🔊 Test Speaker", command=self._test_speaker
+        ).pack(side=tk.LEFT)
+
+        self._speaker_status_var = tk.StringVar(value="")
+        ttk.Label(audio_row, textvariable=self._speaker_status_var).pack(
+            side=tk.LEFT, padx=10
+        )
+
         sliders_frame = ttk.LabelFrame(main, text="Sliders")
         sliders_frame.pack(fill=tk.X, pady=5)
 
@@ -166,6 +181,15 @@ class SettingsTab:
             save_settings(self.core.settings)
         except Exception:
             pass
+
+    def _test_speaker(self) -> None:
+        try:
+            self.core.tts.speak("Speaker test. One, two, three.")
+            self._speaker_status_var.set("🔊 Playing...")
+        except Exception as e:
+            self._speaker_status_var.set(f"⚠️ Failed: {e}")
+            return
+        self.frame.after(3000, lambda: self._speaker_status_var.set(""))
 
     def refresh(self) -> None:
         s = self.core.settings
