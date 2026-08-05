@@ -14,11 +14,12 @@ from turtao.hardware.interfaces import CameraInterface, SerialLinkInterface
 from turtao.patrol.patrol_loop import patrol_loop, set_safe_mode, set_speed
 from turtao.serial_link.esp32_link import ESP32SerialLink
 from turtao.serial_link.protocol import encode_command
-from turtao.state import AppState, Mode, ThreatLabel
+from turtao.state import AppState, Event, Mode, ThreatLabel
 from turtao.vision.antispoof import AntiSpoofDetector
 from turtao.vision.camera import Camera, camera_capture_loop
 from turtao.vision.enrollment import EnrollmentManager
 from turtao.vision.face_recognition_engine import FaceRecognitionEngine
+from turtao.vision.loiter_monitor import LoiterMonitor
 from turtao.vision.person_tracker import PersonTracker
 from turtao.vision.pose_tracker import PoseTracker
 
@@ -55,6 +56,7 @@ class TurtaoCore:
         self.antispoof = AntiSpoofDetector()
         self.enrollment = EnrollmentManager(face_data_dir)
         self.pose_tracker = PoseTracker(state)
+        self.loiter_monitor = LoiterMonitor()
 
         self.tts = TTSManager(piper_dir)
         self.bt_manager = BluetoothManager(config.jbl_mac)
@@ -80,6 +82,7 @@ class TurtaoCore:
             ("_wake_word_loop", self._wake_word_wrapper, ()),
             ("_patrol_loop", self._patrol_wrapper, ()),
             ("_ws_broadcast_loop", ws_broadcast_loop, (self.state,)),
+            ("_loiter_wrapper", self._loiter_wrapper, ()),
         ]
 
         for name, target, args in threads_config:
@@ -141,6 +144,58 @@ class TurtaoCore:
                 with self.state:
                     self.state.pose_landmarks = []
             time.sleep(0.05)
+
+    def _loiter_wrapper(self) -> None:
+        """Poll person/face/pose state and drive the loiter monitor."""
+        while not self.state.stop_event.is_set():
+            self._loiter_tick(time.time())
+            time.sleep(0.1)
+
+    def _loiter_tick(self, now: float) -> None:
+        with self.state:
+            persons = list(self.state.latest_persons)
+            pose_present = bool(self.state.pose_landmarks)
+            faces = list(self.state.threat_state.faces)
+            frame = self.state.latest_frame
+
+        self.loiter_monitor.update(
+            persons=persons,
+            pose_present=pose_present,
+            faces=faces,
+            frame=frame,
+            now=now,
+            record_crop=self._record_loiter_crop,
+            emit_alert=self._emit_loiter_alert,
+        )
+
+    def _record_loiter_crop(
+        self, frame: Any, bbox: tuple[int, int, int, int]
+    ) -> None:
+        import cv2
+
+        try:
+            x1, y1, x2, y2 = bbox
+            crop = frame[max(0, y1):y2, max(0, x1):x2]
+            if crop.size == 0:
+                return
+            unknown_dir = Path("face_data/unknowns")
+            unknown_dir.mkdir(parents=True, exist_ok=True)
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            cv2.imwrite(str(unknown_dir / f"unknown_{ts}.jpg"), crop)
+            logger.info("Loiter: saved unrecognized person crop to unknowns/%s.jpg", ts)
+        except Exception:
+            logger.exception("Loiter: failed to save crop")
+
+    def _emit_loiter_alert(self, message: str) -> None:
+        with self.state:
+            self.state.event_counter += 1
+            self.state.events.append(Event(
+                id=f"evt_{self.state.event_counter}",
+                type="unidentified_person",
+                message=message,
+                at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+            ))
+        logger.warning("Loiter alert: %s", message)
 
     def _serial_wrapper(self) -> None:
         """Delegate to ESP32SerialLink.run() or basic fallback."""
