@@ -6,11 +6,10 @@ Wants=bluetooth.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/turtao
-EnvironmentFile=/home/pi/turtao/.env
+WorkingDirectory=/home/pi/turtao-pi
 Environment=PYTHONUNBUFFERED=1
 ExecStartPre=/bin/sleep 35
-ExecStart=/home/pi/turtao/venv/bin/python3 core.py
+ExecStart=/home/pi/turtao-pi/venv/bin/python3 main.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
