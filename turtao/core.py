@@ -124,7 +124,6 @@ class TurtaoCore:
             with self.state:
                 active = self.state.mode != Mode.IDLE
                 frame = self.state.latest_frame
-                show_mp = self.state.show_mediapipe
 
             self.tracker.set_active(active)
             if active and frame is not None:
@@ -134,12 +133,8 @@ class TurtaoCore:
                         self.state.latest_persons = persons
                 except Exception:
                     logger.exception("Person tracker error")
-                
-                if show_mp:
-                    self.pose_tracker.process_frame(frame)
-                else:
-                    with self.state:
-                        self.state.pose_landmarks = []
+
+                self.pose_tracker.process_frame(frame)
             else:
                 with self.state:
                     self.state.pose_landmarks = []

@@ -77,8 +77,6 @@ class RecognitionTab:
     def _show_frame(self) -> None:
         with self.core.state:
             frame = self.core.state.latest_frame
-            threat_label = self.core.state.threat_label
-            threat_box = self.core.state.threat_state.box
             persons = getattr(self.core.state, "latest_persons", [])
             show_yolo = getattr(self.core.state, "show_yolo", True)
             show_mp = getattr(self.core.state, "show_mediapipe", False)
@@ -93,46 +91,46 @@ class RecognitionTab:
                     cv2.rectangle(rgb, (px1, py1), (px2, py2), (255, 165, 0), 2)
                     cv2.putText(rgb, label, (px1, py1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 165, 0), 2)
 
-            if threat_box is not None:
-                l, t, r, b = threat_box
-                with self.core.state:
-                    name = getattr(self.core.state.threat_state, "name", "")
-                
-                color = (0, 255, 0) if threat_label.value == "SAFE" else (255, 0, 0)
-                cv2.rectangle(rgb, (l, t), (r, b), color, 2)
-                
-                label_text = name if name else threat_label.value
-                cv2.putText(rgb, label_text, (l, max(0, t - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            with self.core.state:
+                faces = list(self.core.state.threat_state.faces)
+
+            for face in faces:
+                fl, ft, fr, fb = face.box
+                color = (0, 255, 0) if face.label.value == "SAFE" else (255, 0, 0)
+                cv2.rectangle(rgb, (fl, ft), (fr, fb), color, 2)
+                cv2.putText(
+                    rgb, face.name, (fl, max(0, ft - 10)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
+                )
 
             if show_mp:
-                # Read 33 dynamic landmarks from state
                 with self.core.state:
-                    pose_lms = getattr(self.core.state, "pose_landmarks", [])
-                
-                # Draw MediaPipe Pose connections
-                if pose_lms and len(pose_lms) >= 33:
-                    pose_connections = [
-                        # Torso
-                        (11, 12), (11, 23), (12, 24), (23, 24),
-                        # Left Arm
-                        (11, 13), (13, 15),
-                        # Right Arm
-                        (12, 14), (14, 16),
-                        # Left Leg
-                        (23, 25), (25, 27),
-                        # Right Leg
-                        (24, 26), (26, 28),
-                        # Shoulders to head connection
-                        (0, 11), (0, 12)
-                    ]
+                    all_pose_lms = list(getattr(self.core.state, "pose_landmarks", []))
+
+                pose_connections = [
+                    # Torso
+                    (11, 12), (11, 23), (12, 24), (23, 24),
+                    # Left Arm
+                    (11, 13), (13, 15),
+                    # Right Arm
+                    (12, 14), (14, 16),
+                    # Left Leg
+                    (23, 25), (25, 27),
+                    # Right Leg
+                    (24, 26), (26, 28),
+                    # Shoulders to head connection
+                    (0, 11), (0, 12)
+                ]
+                core_joints = {0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28}
+
+                for pose_lms in all_pose_lms:
+                    if not pose_lms or len(pose_lms) < 33:
+                        continue
                     for start_idx, end_idx in pose_connections:
                         if start_idx < len(pose_lms) and end_idx < len(pose_lms):
                             pt1 = pose_lms[start_idx]
                             pt2 = pose_lms[end_idx]
                             cv2.line(rgb, pt1, pt2, (0, 255, 255), 2)
-                    
-                    # Only draw joint dots on core nodes (nose, shoulders, elbows, wrists, hips, knees, ankles)
-                    core_joints = {0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28}
                     for idx, pt in enumerate(pose_lms):
                         if idx in core_joints:
                             cv2.circle(rgb, pt, 4, (0, 0, 255), -1)
