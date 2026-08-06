@@ -6,6 +6,7 @@ import numpy as np
 from flask import Blueprint, request, send_file
 
 from turtao.api.errors import APIError
+from turtao.vision.enrollment import QUALITY_GUIDANCE
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,16 @@ def inject_deps(**kwargs) -> None:
 def _enrollment_status(enroll) -> dict:
     s = enroll.get_status()
     active = s.get("status") == "active"
+    # EnrollmentManager tracks quality_issue as a raw internal key (e.g.
+    # "no_face", "blurry") — the GUI translates it to a human message via
+    # this same QUALITY_GUIDANCE dict before displaying it (tab_enroll.py);
+    # do the same here so the app doesn't show the raw key to the user.
+    raw_issue = s.get("quality_issue") or None
     return {
         "active": active,
         "pose_index": (s.get("pose", 1) - 1) if active else 0,
         "poses_total": s.get("total_poses", 5),
-        "quality_issue": s.get("quality_issue") or None,
+        "quality_issue": QUALITY_GUIDANCE.get(raw_issue, raw_issue) if raw_issue else None,
         "processing": enroll.is_processing,
     }
 

@@ -93,6 +93,19 @@ class TestFacesRoutes:
         assert resp.status_code == 409
         assert resp.get_json()["error"] == "CAPTURE_IN_PROGRESS"
 
+    def test_enroll_capture_quality_issue_is_human_readable(self, client, mock_enrollment):
+        # EnrollmentManager tracks quality_issue as a raw key ("blurry"); the
+        # GUI translates it via QUALITY_GUIDANCE before showing it, and the
+        # app relies on this endpoint to have already done the same instead
+        # of showing the raw key.
+        client.post("/api/faces/enroll/start", json={"name": "charlie"})
+        mock_enrollment._fail_next_capture = True
+        resp = client.post("/api/faces/enroll/capture")
+        assert resp.status_code == 200
+        quality_issue = resp.get_json()["quality_issue"]
+        assert quality_issue == "Hold still — the image is blurry"
+        assert quality_issue != "blurry"
+
     def test_enroll_cancel(self, client, mock_enrollment):
         client.post("/api/faces/enroll/start", json={"name": "dave"})
         client.post("/api/faces/enroll/capture")
