@@ -63,6 +63,27 @@ class TestStatusBroadcaster:
         assert payload["data"]["threat"]["box"] == [0.1, 0.2, 0.2, 0.4]
         assert payload["data"]["threat"]["name"] == "alice"
 
+    def test_build_status_serializes_timestamp_as_iso_string(self, mock_state):
+        # ThreatState.timestamp is a raw time.time() float; the app casts
+        # this field as a String and feeds it to DateTime.tryParse, so a
+        # bare number here breaks the app's WS parsing permanently on the
+        # first detection. Must go over the wire as an ISO-8601 string.
+        mock_state.threat_state.timestamp = 1735000000.123
+
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+
+        ts = payload["data"]["threat"]["timestamp"]
+        assert isinstance(ts, str)
+        from datetime import datetime
+
+        datetime.fromisoformat(ts)  # must not raise
+
+    def test_build_status_timestamp_null_by_default(self, mock_state):
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+        assert payload["data"]["threat"]["timestamp"] is None
+
     def test_build_status_normalizes_persons(self, mock_state):
         import numpy as np
 

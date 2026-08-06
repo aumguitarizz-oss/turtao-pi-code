@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import time
+from datetime import datetime, timezone
 
 from flask_sock import Sock
 
@@ -52,7 +53,7 @@ class StatusBroadcaster:
                     "active": ts.active,
                     "face_crop": ts.face_crop if isinstance(ts.face_crop, str) else None,
                     "confidence": ts.confidence,
-                    "timestamp": ts.timestamp,
+                    "timestamp": self._iso_timestamp(ts.timestamp),
                     "box": self._normalized_box(),
                     "name": ts.name or None,
                 },
@@ -73,6 +74,18 @@ class StatusBroadcaster:
                 "persons": self._normalized_persons(),
             },
         }
+
+    @staticmethod
+    def _iso_timestamp(epoch: float | None) -> str | None:
+        """ThreatState.timestamp is a raw time.time() float; the app's
+        WsThreat.fromJson casts this field as a String and feeds it to
+        DateTime.tryParse, so it must go over the wire as ISO-8601, not a
+        bare number — sending the float directly throws a type-cast
+        exception inside the app's WS message handler with no try/catch
+        around it, permanently killing the status stream for that client."""
+        if epoch is None:
+            return None
+        return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
 
     def _normalized_persons(self) -> list[dict]:
         """YOLO-tracked persons this frame, each box as [left, top, width,
