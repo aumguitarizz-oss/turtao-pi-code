@@ -63,6 +63,27 @@ class TestStatusBroadcaster:
         assert payload["data"]["threat"]["box"] == [0.1, 0.2, 0.2, 0.4]
         assert payload["data"]["threat"]["name"] == "alice"
 
+    def test_build_status_normalizes_persons(self, mock_state):
+        import numpy as np
+
+        mock_state.latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        mock_state.latest_persons = [
+            {"bbox": (64, 96, 192, 288), "class_name": "Person", "tracker_id": 3},
+            {"bbox": (0, 0, 10, 10), "class_name": "Cell Phone", "tracker_id": 4},
+        ]
+
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+
+        assert payload["data"]["persons"] == [
+            {"box": [0.1, 0.2, 0.2, 0.4], "tracker_id": 3}
+        ]
+
+    def test_build_status_persons_empty_by_default(self, mock_state):
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+        assert payload["data"]["persons"] == []
+
     def test_build_status_box_none_when_no_box(self, mock_state):
         broadcaster = StatusBroadcaster(mock_state)
         payload = broadcaster._build_status()

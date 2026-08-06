@@ -70,8 +70,34 @@ class StatusBroadcaster:
                     "fr": sd.tof_cm[2] if len(sd.tof_cm) > 2 else 0,
                 },
                 "latency_ms": st.latency_ms,
+                "persons": self._normalized_persons(),
             },
         }
+
+    def _normalized_persons(self) -> list[dict]:
+        """YOLO-tracked persons this frame, each box as [left, top, width,
+        height] normalised 0..1 against the live frame — same contract as
+        threat.box. Always computed/published regardless of --gui; it's
+        the app's toggle, not the Pi's, that decides whether to draw it."""
+        frame = self._state.latest_frame
+        if frame is None:
+            return []
+        try:
+            h, w = frame.shape[:2]
+        except (AttributeError, ValueError):
+            return []
+        if w <= 0 or h <= 0:
+            return []
+        out = []
+        for p in getattr(self._state, "latest_persons", []):
+            if p.get("class_name") != "Person":
+                continue
+            left, top, right, bottom = p["bbox"]
+            out.append({
+                "box": [left / w, top / h, (right - left) / w, (bottom - top) / h],
+                "tracker_id": p.get("tracker_id", -1),
+            })
+        return out
 
     def _normalized_box(self) -> list[float] | None:
         """The current summary face's box as [left, top, width, height],
