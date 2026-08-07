@@ -63,46 +63,54 @@ class StatusBroadcaster:
 
     def _build_status(self) -> dict:
         st = self._state
-        ts = st.threat_state
-        b = st.battery
-        sd = st.sensor_data
-        return {
-            "event": "status",
-            "data": {
-                "connected": st.connected,
-                "threat": {
-                    "active": ts.active,
-                    # active means "a face is currently resolved" (true for
-                    # both SAFE/enrolled and THREAT/unknown matches) — label
-                    # is what actually distinguishes them. The app uses this
-                    # to color the box/banner instead of treating every
-                    # resolved face as an intruder.
-                    "label": st.threat_label.value
-                    if isinstance(st.threat_label, ThreatLabel)
-                    else st.threat_label,
-                    "face_crop": ts.face_crop if isinstance(ts.face_crop, str) else None,
-                    "confidence": ts.confidence,
-                    "timestamp": self._iso_timestamp(ts.timestamp),
-                    "box": self._normalized_box(),
-                    "name": ts.name or None,
+        # threat_label lives on AppState directly while box/name/active live
+        # on the nested threat_state, written as separate statements inside
+        # the same `with self.state:` block on the writer side (core.py /
+        # face_recognition_engine.py). Reading them here without holding the
+        # same lock let a broadcast interleave mid-write and pair a fresh
+        # box/name with a stale label (or vice versa) — hold the lock for
+        # the whole read so the snapshot is consistent.
+        with st:
+            ts = st.threat_state
+            b = st.battery
+            sd = st.sensor_data
+            return {
+                "event": "status",
+                "data": {
+                    "connected": st.connected,
+                    "threat": {
+                        "active": ts.active,
+                        # active means "a face is currently resolved" (true for
+                        # both SAFE/enrolled and THREAT/unknown matches) — label
+                        # is what actually distinguishes them. The app uses this
+                        # to color the box/banner instead of treating every
+                        # resolved face as an intruder.
+                        "label": st.threat_label.value
+                        if isinstance(st.threat_label, ThreatLabel)
+                        else st.threat_label,
+                        "face_crop": ts.face_crop if isinstance(ts.face_crop, str) else None,
+                        "confidence": ts.confidence,
+                        "timestamp": self._iso_timestamp(ts.timestamp),
+                        "box": self._normalized_box(),
+                        "name": ts.name or None,
+                    },
+                    "mode": st.mode.value if isinstance(st.mode, Mode) else st.mode,
+                    "battery": {
+                        "percent": int(b.percent),
+                        "voltage": b.voltage,
+                        "current": b.current_ma,
+                        "state": b.status.upper(),
+                    },
+                    "heading": st.heading,
+                    "tof": {
+                        "fl": sd.tof_cm[0] if len(sd.tof_cm) > 0 else 0,
+                        "fc": sd.tof_cm[1] if len(sd.tof_cm) > 1 else 0,
+                        "fr": sd.tof_cm[2] if len(sd.tof_cm) > 2 else 0,
+                    },
+                    "latency_ms": st.latency_ms,
+                    "persons": self._normalized_persons(),
                 },
-                "mode": st.mode.value if isinstance(st.mode, Mode) else st.mode,
-                "battery": {
-                    "percent": int(b.percent),
-                    "voltage": b.voltage,
-                    "current": b.current_ma,
-                    "state": b.status.upper(),
-                },
-                "heading": st.heading,
-                "tof": {
-                    "fl": sd.tof_cm[0] if len(sd.tof_cm) > 0 else 0,
-                    "fc": sd.tof_cm[1] if len(sd.tof_cm) > 1 else 0,
-                    "fr": sd.tof_cm[2] if len(sd.tof_cm) > 2 else 0,
-                },
-                "latency_ms": st.latency_ms,
-                "persons": self._normalized_persons(),
-            },
-        }
+            }
 
     @staticmethod
     def _iso_timestamp(epoch: float | None) -> str | None:

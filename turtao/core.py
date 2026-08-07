@@ -127,14 +127,22 @@ class TurtaoCore:
             if mode == Mode.IDLE:
                 with self.state:
                     self.state.threat_label = ThreatLabel.IDLE
+                    self.state.threat_state.active = False
+                    self.state.threat_state.box = None
+                    self.state.threat_state.landmarks = []
+                    self.state.threat_state.name = ""
+                    self.state.threat_state.faces = []
                 time.sleep(0.1)
                 continue
 
             if frame is not None:
                 self.face_engine.process_frame(frame)
-            else:
-                with self.state:
-                    self.state.threat_label = ThreatLabel.IDLE
+            # else: no new frame this tick (camera/producer hiccup, not a
+            # "nothing detected" signal) — leave threat_label/threat_state
+            # untouched so a momentary frame gap can't desync the label
+            # from the still-current box/name. process_frame() owns
+            # clearing both together once its own persistence limit
+            # (_frames_since_seen > 5) is hit.
             # dlib's HOG detector isn't cheap on ARM without SSE/AVX — at a
             # 0.03s sleep this loop re-runs detection almost immediately
             # after each call finishes, effectively pinning a full CPU core

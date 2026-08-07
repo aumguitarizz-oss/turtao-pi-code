@@ -6,7 +6,7 @@ import pytest
 from turtao.config import AppConfig, Settings
 from turtao.core import TurtaoCore
 from turtao.hardware.mocks import MockCamera, MockSerialLink
-from turtao.state import AppState
+from turtao.state import AppState, Mode, ThreatLabel
 
 
 @pytest.fixture
@@ -68,3 +68,31 @@ class TestLoiterWrapperIntegration:
 
         assert len(core.state.events) == 1
         assert "tracker #1" in core.state.events[0].message
+
+
+class TestFaceRecognitionWrapperFrameGap:
+    def test_transient_frame_gap_does_not_reset_threat_label(self, core, monkeypatch):
+        """Regression: a momentary empty frame_queue (camera/producer hiccup,
+        not a real "nothing resolved" signal) must not instantly flip
+        threat_label to IDLE while threat_state.box/name from the last
+        resolved detection are still populated — that desync made an
+        unresolved THREAT render as a green/safe box in the app, since the
+        label (not the box) is what the app colors by. Only Mode.IDLE or
+        process_frame()'s own persistence-limit clear should reset label and
+        box/name together."""
+        with core.state:
+            core.state.mode = Mode.PATROL
+            core.state.frame_queue.clear()  # no frame available this tick
+            core.state.threat_label = ThreatLabel.THREAT
+            core.state.threat_state.box = (10, 10, 50, 50)
+            core.state.threat_state.name = "Unknown 1"
+
+        monkeypatch.setattr(
+            "turtao.core.time.sleep", lambda *_: core.state.stop_event.set()
+        )
+
+        core._face_recognition_wrapper()
+
+        assert core.state.threat_label == ThreatLabel.THREAT
+        assert core.state.threat_state.box == (10, 10, 50, 50)
+        assert core.state.threat_state.name == "Unknown 1"
