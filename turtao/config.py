@@ -76,11 +76,17 @@ class Settings(BaseModel):
         save_settings(self)
 
 
+# Mi Bluetooth speaker — the robot's main audio output. Hardcoded default so
+# it works out of the box without .env setup; still overridable via JBL_MAC
+# for whoever swaps the speaker again later.
+MAIN_SPEAKER_MAC = "04:57:91:54:96:22"
+
+
 class AppConfig(BaseModel):
     flask_port: int = Field(default=5000, ge=1024, le=65535)
     esp32_port: str = ""
     camera_index: int = 0
-    jbl_mac: str = ""
+    jbl_mac: str = MAIN_SPEAKER_MAC
 
 
 def load_dotenv_config() -> AppConfig:
@@ -91,7 +97,7 @@ def load_dotenv_config() -> AppConfig:
         flask_port=int(os.getenv("FLASK_PORT", "5000")),
         esp32_port=os.getenv("ESP32_PORT", ""),
         camera_index=int(os.getenv("CAMERA_INDEX", "0")),
-        jbl_mac=os.getenv("JBL_MAC", ""),
+        jbl_mac=os.getenv("JBL_MAC", MAIN_SPEAKER_MAC),
     )
 
 

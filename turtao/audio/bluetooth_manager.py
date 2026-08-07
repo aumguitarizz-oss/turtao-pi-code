@@ -5,6 +5,8 @@ import subprocess
 import time
 from pathlib import Path
 
+from turtao.config import MAIN_SPEAKER_MAC
+
 logger = logging.getLogger(__name__)
 
 _PARENT = Path(__file__).resolve().parent.parent.parent
@@ -12,12 +14,12 @@ SILENCE_WAV = _PARENT / "sounds" / "silence.wav"
 
 
 class BluetoothManager:
-    def __init__(self, jbl_mac: str = "") -> None:
+    def __init__(self, jbl_mac: str = MAIN_SPEAKER_MAC) -> None:
         self._mac = jbl_mac
         self._keepalive_proc: subprocess.Popen[bytes] | None = None
         self._connected = False
         if not jbl_mac:
-            logger.warning("JBL_MAC not configured; Bluetooth disabled")
+            logger.warning("No speaker MAC configured; Bluetooth disabled")
 
     @property
     def is_connected(self) -> bool:
@@ -34,13 +36,13 @@ class BluetoothManager:
             )
             if result.returncode == 0:
                 self._connected = True
-                logger.info("Connected to JBL Go 3 (%s)", self._mac)
+                logger.info("Connected to main speaker (%s)", self._mac)
                 return True
             stderr = result.stderr.decode(errors="replace").strip()
             logger.warning("bluetoothctl connect failed (rc=%d): %s", result.returncode, stderr)
             return False
         except (subprocess.TimeoutExpired, OSError) as e:
-            logger.error("Failed to connect to JBL: %s", e)
+            logger.error("Failed to connect to main speaker: %s", e)
             return False
 
     def start_silent_keepalive(self) -> None:
@@ -87,9 +89,9 @@ class BluetoothManager:
                     capture_output=True,
                     timeout=10,
                 )
-                logger.info("Disconnected JBL Go 3 (%s)", self._mac)
+                logger.info("Disconnected main speaker (%s)", self._mac)
             except (subprocess.TimeoutExpired, OSError) as e:
-                logger.error("Failed to disconnect JBL: %s", e)
+                logger.error("Failed to disconnect main speaker: %s", e)
 
 
 def bluetooth_loop(state: object, bt_manager: BluetoothManager) -> None:
