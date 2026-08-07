@@ -61,3 +61,20 @@ class TestIntercomWsHandler:
 
         bridge.feed_pcm.assert_not_called()
         bridge.stop.assert_called_once()
+
+    def test_hangs_up_immediately_if_the_audio_bridge_failed_to_start(self):
+        # e.g. PyAudio rejecting the sample rate against the Bluetooth
+        # sink. Previously the WS accepted the connection regardless and
+        # every PCM frame was silently dropped in feed_pcm() for the rest
+        # of the session -- the app had no way to know. Now the receive
+        # loop is never entered, so the app-side socket sees an immediate
+        # close instead of a session that looks alive but plays nothing.
+        ws = MagicMock()
+        bridge = MagicMock()
+        bridge.is_running = False
+
+        handle_intercom_client(ws, bridge)
+
+        ws.receive.assert_not_called()
+        bridge.feed_pcm.assert_not_called()
+        bridge.stop.assert_called_once()
