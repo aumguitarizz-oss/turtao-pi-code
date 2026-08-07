@@ -8,6 +8,7 @@ from typing import Any
 
 from turtao.api.ws_status import ws_broadcast_loop
 from turtao.audio.bluetooth_manager import BluetoothManager, bluetooth_loop
+from turtao.audio.intercom import IntercomBridge
 from turtao.audio.tts import TTSManager
 from turtao.config import BASE_DIR, AppConfig, Settings
 from turtao.hardware.interfaces import CameraInterface, SerialLinkInterface
@@ -66,6 +67,7 @@ class TurtaoCore:
 
         self.tts = TTSManager(piper_dir)
         self.bt_manager = BluetoothManager(config.jbl_mac)
+        self.intercom_bridge = IntercomBridge()
 
         self._threads: list[threading.Thread] = []
         self._start_time: float = 0.0

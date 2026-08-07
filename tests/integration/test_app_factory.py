@@ -19,6 +19,7 @@ class TestCreateApp:
             bt_manager=MagicMock(),
             tracker=MagicMock(),
             antispoof=MagicMock(),
+            intercom_bridge=MagicMock(),
         )
 
         assert app is not None

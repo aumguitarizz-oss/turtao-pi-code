@@ -49,6 +49,7 @@ def main():
             state, settings, config, core.serial, core.camera,
             core.face_engine, core.enrollment, core.tts,
             core.bt_manager, core.tracker, core.antispoof,
+            core.intercom_bridge,
         )
         flask_thread = threading.Thread(
             target=lambda: app.run(
@@ -70,6 +71,7 @@ def main():
             state, settings, config, core.serial, core.camera,
             core.face_engine, core.enrollment, core.tts,
             core.bt_manager, core.tracker, core.antispoof,
+            core.intercom_bridge,
         )
         app.run(
             host="0.0.0.0", port=config.flask_port, debug=False, use_reloader=False, threaded=True,

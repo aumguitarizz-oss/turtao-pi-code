@@ -7,7 +7,10 @@ from flask_sock import Sock
 logger = logging.getLogger(__name__)
 
 
-def create_app(state, settings, config, serial_link, camera, face_engine, enrollment, tts, bt_manager, tracker, antispoof) -> Flask:
+def create_app(
+    state, settings, config, serial_link, camera, face_engine, enrollment,
+    tts, bt_manager, tracker, antispoof, intercom_bridge,
+) -> Flask:
     app = Flask(__name__)
     CORS(app, origins="*")
     sock = Sock(app)
@@ -23,6 +26,7 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     app.config["BT_MANAGER"] = bt_manager
     app.config["TRACKER"] = tracker
     app.config["ANTISPOOF"] = antispoof
+    app.config["INTERCOM_BRIDGE"] = intercom_bridge
     app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
     from turtao.api.errors import register_error_handlers
@@ -77,6 +81,6 @@ def create_app(state, settings, config, serial_link, camera, face_engine, enroll
     from turtao.api.ws_intercom import register_intercom_ws
     from turtao.api.ws_status import register_status_ws
     register_status_ws(sock, state)
-    register_intercom_ws(sock)
+    register_intercom_ws(sock, intercom_bridge)
 
     return app
