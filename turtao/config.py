@@ -25,6 +25,7 @@ class TTSEventToggles(BaseModel):
 class Notifications(BaseModel):
     threat: bool = True
     gas_danger: bool = True
+    temp_danger: bool = True
     low_battery: bool = True
     tamper: bool = True
     connection_lost: bool = True
@@ -44,6 +45,14 @@ class Settings(BaseModel):
     # for a fast, uninterrupted enrollment (e.g. a live demo) at the cost
     # of weaker embeddings from lower-quality poses.
     strict_face_scan: bool = True
+    # MQ2 gas sensor + DHT temperature alert thresholds — a reading outside
+    # [low, high] logs an alert event (turtao/core.py's
+    # _check_sensor_alerts). Defaults are starting points, not calibrated
+    # against real hardware; adjust from the app's Settings tab.
+    gas_threshold_low: float = 50.0
+    gas_threshold_high: float = 400.0
+    temp_threshold_low: float = 0.0
+    temp_threshold_high: float = 45.0
     speed: float = 0.8
     safe_mode: bool = False
     auto_flashbang: bool = False

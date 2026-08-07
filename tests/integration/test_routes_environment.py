@@ -72,3 +72,11 @@ class TestEnvironmentRoutes:
         data = resp.get_json()
         assert len(data["tof_cm"]) == 4
         assert data["tof_cm"] == [10, 20, 30, 40]
+
+    def test_test_alert_route_emits_gas_and_temp_events(self, client, mock_state):
+        resp = client.post("/api/sensors/test-alert")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"ok": True}
+        types = [e.type for e in mock_state.events]
+        assert "gas_danger" in types
+        assert "temp_danger" in types

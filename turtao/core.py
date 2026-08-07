@@ -14,7 +14,7 @@ from turtao.hardware.interfaces import CameraInterface, SerialLinkInterface
 from turtao.patrol.patrol_loop import patrol_loop, set_safe_mode, set_speed
 from turtao.serial_link.esp32_link import ESP32SerialLink
 from turtao.serial_link.protocol import encode_command
-from turtao.state import AppState, Event, Mode, ThreatLabel
+from turtao.state import AppState, Mode, ThreatLabel
 from turtao.vision.antispoof import AntiSpoofDetector
 from turtao.vision.camera import Camera, camera_capture_loop
 from turtao.vision.enrollment import EnrollmentManager
@@ -70,9 +70,11 @@ class TurtaoCore:
         self._threads: list[threading.Thread] = []
         self._start_time: float = 0.0
         self._last_loiter_crop_save: float = 0.0
+        self._gas_alert_active: bool = False
+        self._temp_alert_active: bool = False
 
     def start(self) -> None:
-        """Open hardware connections, start all 8 daemon threads."""
+        """Open hardware connections, start all 9 daemon threads."""
         self._start_time = time.time()
 
         try:
@@ -90,6 +92,7 @@ class TurtaoCore:
             ("_patrol_loop", self._patrol_wrapper, ()),
             ("_ws_broadcast_loop", ws_broadcast_loop, (self.state,)),
             ("_loiter_wrapper", self._loiter_wrapper, ()),
+            ("_sensor_alert_wrapper", self._sensor_alert_wrapper, ()),
         ]
 
         for name, target, args in threads_config:
@@ -217,15 +220,39 @@ class TurtaoCore:
             logger.exception("Loiter: failed to save crop")
 
     def _emit_loiter_alert(self, message: str) -> None:
-        with self.state:
-            self.state.event_counter += 1
-            self.state.events.append(Event(
-                id=f"evt_{self.state.event_counter}",
-                type="unidentified_person",
-                message=message,
-                at=time.strftime("%Y-%m-%dT%H:%M:%S"),
-            ))
+        self.state.emit_event("unidentified_person", message)
         logger.warning("Loiter alert: %s", message)
+
+    def _sensor_alert_wrapper(self) -> None:
+        while not self.state.stop_event.is_set():
+            self._check_sensor_alerts()
+            time.sleep(1.0)
+
+    def _check_sensor_alerts(self) -> None:
+        with self.state:
+            gas = self.state.sensor_data.gas_mq2
+            temp = self.state.sensor_data.temp_inside_c
+
+        gas_bad = gas < self.settings.gas_threshold_low or gas > self.settings.gas_threshold_high
+        # Rising-edge guard so a sustained out-of-range reading logs one
+        # event, not one per poll — same pattern as the threat-detection
+        # event in face_recognition_engine.py.
+        if gas_bad and not self._gas_alert_active:
+            self._gas_alert_active = True
+            self.state.emit_event("gas_danger", f"MQ2 gas reading out of range: {gas}")
+            logger.warning("Gas alert: reading %s outside [%s, %s]",
+                            gas, self.settings.gas_threshold_low, self.settings.gas_threshold_high)
+        elif not gas_bad:
+            self._gas_alert_active = False
+
+        temp_low, temp_high = self.settings.temp_threshold_low, self.settings.temp_threshold_high
+        temp_bad = temp < temp_low or temp > temp_high
+        if temp_bad and not self._temp_alert_active:
+            self._temp_alert_active = True
+            self.state.emit_event("temp_danger", f"Temperature reading out of range: {temp}°C")
+            logger.warning("Temperature alert: %s outside [%s, %s]", temp, temp_low, temp_high)
+        elif not temp_bad:
+            self._temp_alert_active = False
 
     def _serial_wrapper(self) -> None:
         """Delegate to ESP32SerialLink.run() or basic fallback."""

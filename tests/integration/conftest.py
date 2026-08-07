@@ -1,11 +1,12 @@
 import copy
+import time
 import pytest
 from unittest.mock import MagicMock
 from flask import Flask
 from flask_cors import CORS
 from flask_sock import Sock
 from turtao.hardware.mocks import MockSerialLink
-from turtao.state import Mode, ThreatLabel, ThreatState, BatteryData, SensorData
+from turtao.state import BatteryData, Event, Mode, SensorData, ThreatLabel, ThreatState
 
 
 class MockState:
@@ -30,9 +31,20 @@ class MockState:
         self.latency_ms = 0
         self.speed = 1.0
         self.event_log = []
+        self.events = []
+        self.event_counter = 0
         self.map_grid = []
         self.map_trail = []
         self.latest_frame = "fake_frame"
+
+    def emit_event(self, event_type, message):
+        self.event_counter += 1
+        self.events.append(Event(
+            id=f"evt_{self.event_counter}",
+            type=event_type,
+            message=message,
+            at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+        ))
 
     def acquire(self):
         pass

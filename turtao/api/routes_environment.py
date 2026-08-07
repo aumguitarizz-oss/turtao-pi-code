@@ -36,6 +36,21 @@ def get_environment():
     }
 
 
+@environment_bp.route("/api/sensors/test-alert", methods=["POST"])
+def test_sensor_alert():
+    """Fires one gas_danger and one temp_danger event through the exact
+    same state.emit_event path the real threshold check in core.py uses,
+    so the Settings tab's "Send test alert" button can verify the whole
+    pipeline (Pi event -> app event log) without needing to actually
+    create a dangerous gas or temperature reading."""
+    st = _deps.get("state")
+    if st is None:
+        return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
+    st.emit_event("gas_danger", "Test alert: MQ2 gas reading out of range")
+    st.emit_event("temp_danger", "Test alert: temperature reading out of range")
+    return {"ok": True}
+
+
 @environment_bp.route("/api/battery")
 def get_battery():
     st = _deps.get("state")

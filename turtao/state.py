@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
@@ -112,6 +113,21 @@ class AppState:
     @property
     def stop_event(self) -> threading.Event:
         return self._stop_event
+
+    def emit_event(self, event_type: str, message: str) -> None:
+        """Append an Event, thread-safe regardless of whether the caller
+        already holds the state lock (acquires its own). Lets both
+        core.py's background loops and Flask routes (which only ever get
+        `state` injected, not the TurtaoCore orchestrator) log an event the
+        same way."""
+        with self:
+            self.event_counter += 1
+            self.events.append(Event(
+                id=f"evt_{self.event_counter}",
+                type=event_type,
+                message=message,
+                at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+            ))
 
     def acquire(self) -> None:
         self._lock.acquire()
