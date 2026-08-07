@@ -137,6 +137,29 @@ class TestFaceRecognitionEngine:
         engine.process_frame(frame)
         assert app_state.threat_label == ThreatLabel.THREAT
 
+    @patch("turtao.vision.face_recognition_engine.face_recognition")
+    @patch("turtao.vision.face_recognition_engine.cv2")
+    def test_unknown_face_logs_one_threat_event_on_rising_edge(
+        self, mock_cv2, mock_fr, app_state: AppState
+    ):
+        # state.events was previously only ever populated by the loiter
+        # monitor's own alert path — routine threat detection never showed
+        # up in "recent events" at all. This pins the fix: one event per
+        # new sighting, not one per frame while the threat persists.
+        mock_fr.face_locations.return_value = [(100, 200, 300, 50)]
+        mock_fr.face_encodings.return_value = [np.array([0.5, 0.5, 0.5, 0.5])]
+        mock_cv2.resize.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+        mock_cv2.cvtColor.return_value = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        engine = FaceRecognitionEngine(app_state)
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        engine.process_frame(frame)
+        engine.process_frame(frame)
+
+        threat_events = [e for e in app_state.events if e.type == "threat"]
+        assert len(threat_events) == 1
+
     def test_load_embeddings_missing_directory_logs_warning(
         self, app_state: AppState, caplog
     ):

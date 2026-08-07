@@ -16,6 +16,7 @@ class StatusBroadcaster:
         self._clients: set = set()
         self._lock = threading.Lock()
         self._state = state
+        self._broadcast_count = 0
 
     def add_client(self, ws) -> None:
         with self._lock:
@@ -27,9 +28,29 @@ class StatusBroadcaster:
 
     def broadcast(self) -> None:
         payload = self._build_status()
-        dead: list = []
+        self._broadcast_count += 1
         with self._lock:
+            client_count = len(self._clients)
             clients = list(self._clients)
+        # Time-based (every ~10s at the caller's 2s cadence), not
+        # change-based, so it can't scroll out of a `tail` the way an
+        # earlier throttled-diagnostic attempt did (see HANDOFF.md) — the
+        # box/persons data is populated far upstream of this broadcast, so
+        # this pins down whether a "box doesn't show" report is a transport
+        # problem (clients=0, or box/persons present but nothing arrives)
+        # or a data problem (latest_frame is None / box stays null here).
+        if self._broadcast_count % 5 == 0:
+            data = payload["data"]
+            logger.info(
+                "DIAGNOSTIC: ws broadcast — clients=%d latest_frame=%s "
+                "persons=%d threat_active=%s box=%s",
+                client_count,
+                "present" if self._state.latest_frame is not None else "None",
+                len(data["persons"]),
+                data["threat"]["active"],
+                data["threat"]["box"],
+            )
+        dead: list = []
         for ws in clients:
             try:
                 ws.send(json.dumps(payload))

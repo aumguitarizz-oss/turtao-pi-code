@@ -11,7 +11,7 @@ import cv2
 import face_recognition
 import numpy as np
 
-from turtao.state import AppState, FaceDetection, ThreatLabel
+from turtao.state import AppState, Event, FaceDetection, ThreatLabel
 from turtao.vision.dlib_lock import DLIB_LOCK
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,11 @@ class FaceRecognitionEngine:
         self._last_tts_threat = 0.0
         self._frames_since_seen = 0
         self._last_logged_face_count = -1
+        # Rising-edge guard so a sustained threat logs one event, not one
+        # per frame — mirrors the loiter monitor's own event pattern
+        # (core.py's _emit_loiter_alert), which is otherwise the only
+        # thing that ever populates state.events.
+        self._threat_event_active = False
 
     def load_embeddings(self, profile_dir: str) -> None:
         path = Path(profile_dir)
@@ -227,6 +232,7 @@ class FaceRecognitionEngine:
                     self._state.threat_state.name = ""
                     self._state.threat_state.active = False
                     self._state.threat_state.faces = []
+                    self._threat_event_active = False
             return
 
         faces: list[FaceDetection] = []
@@ -303,6 +309,18 @@ class FaceRecognitionEngine:
             self._frames_since_seen = 0
             self._update_threat_state(summary.box, summary.confidence, [], summary.name, faces)
             self._state.threat_label = match_label
+
+            if threat_faces and not self._threat_event_active:
+                self._threat_event_active = True
+                self._state.event_counter += 1
+                self._state.events.append(Event(
+                    id=f"evt_{self._state.event_counter}",
+                    type="threat",
+                    message=f"Unknown person detected ({threat_faces[0].name})",
+                    at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+                ))
+            elif not threat_faces:
+                self._threat_event_active = False
 
             if match_label == ThreatLabel.THREAT:
                 pan, tilt = _calculate_aim(*summary.box)
