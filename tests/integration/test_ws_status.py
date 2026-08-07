@@ -2,10 +2,33 @@ import json
 import pytest
 from unittest.mock import MagicMock
 from turtao.api.ws_status import StatusBroadcaster
+from turtao.state import ThreatLabel
 from tests.integration.conftest import MockState
 
 
 class TestStatusBroadcaster:
+    def test_threat_label_distinguishes_safe_from_threat_with_active_true_for_both(
+        self, mock_state
+    ):
+        # active alone can't tell a recognized/enrolled owner apart from an
+        # unknown intruder — it's set True for both. label is what the app
+        # must use to decide box color / whether to show "Intruder
+        # detected". Regression test for a real bug: an enrolled owner
+        # matched correctly (name shown) but was still treated as an
+        # intruder because the app had no way to see this distinction.
+        mock_state.threat_state.active = True
+        mock_state.threat_label = ThreatLabel.SAFE
+        broadcaster = StatusBroadcaster(mock_state)
+        data = broadcaster._build_status()["data"]
+        assert data["threat"]["active"] is True
+        assert data["threat"]["label"] == "SAFE"
+
+        mock_state.threat_label = ThreatLabel.THREAT
+        data = StatusBroadcaster(mock_state)._build_status()["data"]
+        assert data["threat"]["active"] is True
+        assert data["threat"]["label"] == "THREAT"
+
+
     def test_build_status_contains_expected_keys(self, mock_state):
         mock_state.mode = "GUARD"
         mock_state.connected = True

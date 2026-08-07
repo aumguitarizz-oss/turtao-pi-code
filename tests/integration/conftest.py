@@ -5,7 +5,7 @@ from flask import Flask
 from flask_cors import CORS
 from flask_sock import Sock
 from turtao.hardware.mocks import MockSerialLink
-from turtao.state import Mode, ThreatState, BatteryData, SensorData
+from turtao.state import Mode, ThreatLabel, ThreatState, BatteryData, SensorData
 
 
 class MockState:
@@ -19,6 +19,7 @@ class MockState:
         self.mode = Mode.IDLE
         self.connected = False
         self.threat_state = ThreatState()
+        self.threat_label = ThreatLabel.IDLE
         self.battery = BatteryData()
         self.sensor_data = SensorData()
         self.sensor_data.ble_devices = [

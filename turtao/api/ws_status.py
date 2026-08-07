@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from flask_sock import Sock
 
-from turtao.state import Mode
+from turtao.state import Mode, ThreatLabel
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,14 @@ class StatusBroadcaster:
                 "connected": st.connected,
                 "threat": {
                     "active": ts.active,
+                    # active means "a face is currently resolved" (true for
+                    # both SAFE/enrolled and THREAT/unknown matches) — label
+                    # is what actually distinguishes them. The app uses this
+                    # to color the box/banner instead of treating every
+                    # resolved face as an intruder.
+                    "label": st.threat_label.value
+                    if isinstance(st.threat_label, ThreatLabel)
+                    else st.threat_label,
                     "face_crop": ts.face_crop if isinstance(ts.face_crop, str) else None,
                     "confidence": ts.confidence,
                     "timestamp": self._iso_timestamp(ts.timestamp),
