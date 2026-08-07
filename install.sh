@@ -115,23 +115,9 @@ import openwakeword
 openwakeword.utils.download_models()
 " 2>/dev/null || echo "(openWakeWord models may need manual download)"
 
-# ── silence.wav and alert.wav ──────────────────────────────────────
+# ── alert.wav (also used as BluetoothManager's connected-chime) ─────
 echo ">>> Generating audio files..."
 mkdir -p "$SOUNDS_DIR"
-if [ ! -f "$SOUNDS_DIR/silence.wav" ]; then
-    python3 -c "
-import wave
-import struct
-import math
-sr = 22050
-dur = 1
-with wave.open('$SOUNDS_DIR/silence.wav', 'w') as w:
-    w.setnchannels(1)
-    w.setsampwidth(2)
-    w.setframerate(sr)
-    w.writeframes(b'\x00\x00' * sr * dur)
-"
-fi
 if [ ! -f "$SOUNDS_DIR/alert.wav" ]; then
     python3 -c "
 import wave

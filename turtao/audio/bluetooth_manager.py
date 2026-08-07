@@ -10,13 +10,14 @@ from turtao.config import MAIN_SPEAKER_MAC
 logger = logging.getLogger(__name__)
 
 _PARENT = Path(__file__).resolve().parent.parent.parent
-SILENCE_WAV = _PARENT / "sounds" / "silence.wav"
+# Reuses the tone install.sh already generates for the (currently
+# unrelated) alert-sound provisioning step — no need for a second asset.
+CONNECTED_CHIME = _PARENT / "sounds" / "alert.wav"
 
 
 class BluetoothManager:
     def __init__(self, jbl_mac: str = MAIN_SPEAKER_MAC) -> None:
         self._mac = jbl_mac
-        self._keepalive_proc: subprocess.Popen[bytes] | None = None
         self._connected = False
         if not jbl_mac:
             logger.warning("No speaker MAC configured; Bluetooth disabled")
@@ -37,6 +38,7 @@ class BluetoothManager:
             if result.returncode == 0:
                 self._connected = True
                 logger.info("Connected to main speaker (%s)", self._mac)
+                self._play_connected_chime()
                 return True
             stderr = result.stderr.decode(errors="replace").strip()
             logger.warning("bluetoothctl connect failed (rc=%d): %s", result.returncode, stderr)
@@ -45,43 +47,25 @@ class BluetoothManager:
             logger.error("Failed to connect to main speaker: %s", e)
             return False
 
-    def start_silent_keepalive(self) -> None:
-        if not SILENCE_WAV.exists():
-            logger.warning("Silence file not found: %s", SILENCE_WAV)
+    def _play_connected_chime(self) -> None:
+        """One-shot audible confirmation that the speaker paired — not a
+        keepalive. Once connected, any real playback (TTS, alerts) already
+        goes to whatever the default audio sink is, so no ongoing silent
+        stream is needed to keep the link "warm" between them."""
+        if not CONNECTED_CHIME.exists():
+            logger.warning("Connected-chime file not found: %s", CONNECTED_CHIME)
             return
         try:
-            self._keepalive_proc = subprocess.Popen(
-                ["aplay", "--loop", str(SILENCE_WAV)],
+            subprocess.Popen(
+                ["aplay", str(CONNECTED_CHIME)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            logger.info("Keepalive started (PID %d)", self._keepalive_proc.pid)
         except OSError as e:
-            logger.error("Failed to start keepalive: %s", e)
-
-    def check_keepalive(self) -> None:
-        if self._keepalive_proc is None:
-            logger.warning("Keepalive not running; starting")
-            self.start_silent_keepalive()
-            return
-        if self._keepalive_proc.poll() is not None:
-            logger.warning("Keepalive died (rc=%s); restarting", self._keepalive_proc.returncode)
-            self.start_silent_keepalive()
+            logger.error("Failed to play connected chime: %s", e)
 
     def disconnect(self) -> None:
         self._connected = False
-        if self._keepalive_proc is not None:
-            try:
-                self._keepalive_proc.terminate()
-                self._keepalive_proc.wait(timeout=5)
-            except (OSError, subprocess.TimeoutExpired) as e:
-                logger.warning("Keepalive terminate failed: %s", e)
-                try:
-                    self._keepalive_proc.kill()
-                    self._keepalive_proc.wait(timeout=3)
-                except OSError:
-                    pass
-            self._keepalive_proc = None
         if self._mac:
             try:
                 subprocess.run(
@@ -95,14 +79,12 @@ class BluetoothManager:
 
 
 def bluetooth_loop(state: object, bt_manager: BluetoothManager) -> None:
+    """Connect once, ~35s after boot (giving the BT stack time to init).
+    No ongoing keepalive loop — real audio playback already routes to the
+    speaker once connected, and reconnecting after a drop is a manual/
+    future concern, not something this loop handles today."""
     logger.info("Bluetooth loop started; waiting 35 s for BT init")
     time.sleep(35)
 
     if not bt_manager.is_connected:
         bt_manager.connect()
-
-    bt_manager.start_silent_keepalive()
-
-    while True:
-        time.sleep(60)
-        bt_manager.check_keepalive()

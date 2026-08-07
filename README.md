@@ -210,7 +210,7 @@ turtao-pi/
 │   └── unknowns/
 ├── models/                  # YOLOv8n ONNX model
 ├── piper/                   # Piper TTS binary + voice model
-├── sounds/                  # silence.wav, alert.wav
+├── sounds/                  # alert.wav (also BluetoothManager's connected-chime)
 └── systemd/
     └── turtao.service       # Systemd unit file
 ```
