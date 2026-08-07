@@ -200,7 +200,10 @@ class TurtaoCore:
             now=now,
             record_crop=self._record_loiter_crop,
             emit_alert=self._emit_loiter_alert,
+            emit_alarm=self._emit_loiter_alarm,
         )
+        with self.state:
+            self.state.alarmed_person_ids = self.loiter_monitor.alarmed_ids()
 
     def _record_loiter_crop(
         self, frame: Any, bbox: tuple[int, int, int, int]
@@ -230,6 +233,10 @@ class TurtaoCore:
     def _emit_loiter_alert(self, message: str) -> None:
         self.state.emit_event("unidentified_person", message)
         logger.warning("Loiter alert: %s", message)
+
+    def _emit_loiter_alarm(self, tracker_id: int, message: str) -> None:
+        self.state.emit_event("loitering_alarm", message)
+        logger.warning("Loiter alarm (tracker #%s): %s", tracker_id, message)
 
     def _sensor_alert_wrapper(self) -> None:
         while not self.state.stop_event.is_set():

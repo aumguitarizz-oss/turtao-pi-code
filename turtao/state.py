@@ -105,6 +105,10 @@ class AppState:
         self.show_mediapipe: bool = False
         self.pose_landmarks: list[list[tuple[int, int]]] = []  # one list per detected person
         self.frame_queue: deque = deque(maxlen=2)
+        # tracker_ids currently past LoiterMonitor's 10s alarm threshold —
+        # lets the WS payload mark just that person's box for the app's
+        # distinct (not full-THREAT) lingering-person alarm styling.
+        self.alarmed_person_ids: set[int] = set()
         self.events: deque[Event] = deque(maxlen=50)
         self.event_counter: int = 0
         self.serial_command_queue: deque[dict[str, Any]] = deque()

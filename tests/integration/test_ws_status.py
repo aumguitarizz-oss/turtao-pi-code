@@ -120,8 +120,24 @@ class TestStatusBroadcaster:
         payload = broadcaster._build_status()
 
         assert payload["data"]["persons"] == [
-            {"box": [0.1, 0.2, 0.2, 0.4], "tracker_id": 3}
+            {"box": [0.1, 0.2, 0.2, 0.4], "tracker_id": 3, "alarm": False}
         ]
+
+    def test_build_status_marks_alarmed_person(self, mock_state):
+        import numpy as np
+
+        mock_state.latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        mock_state.latest_persons = [
+            {"bbox": (64, 96, 192, 288), "class_name": "Person", "tracker_id": 3},
+            {"bbox": (0, 0, 10, 10), "class_name": "Person", "tracker_id": 5},
+        ]
+        mock_state.alarmed_person_ids = {3}
+
+        broadcaster = StatusBroadcaster(mock_state)
+        payload = broadcaster._build_status()
+
+        by_tracker = {p["tracker_id"]: p["alarm"] for p in payload["data"]["persons"]}
+        assert by_tracker == {3: True, 5: False}
 
     def test_build_status_persons_empty_by_default(self, mock_state):
         broadcaster = StatusBroadcaster(mock_state)

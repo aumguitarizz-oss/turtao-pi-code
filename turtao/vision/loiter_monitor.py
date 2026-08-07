@@ -9,6 +9,7 @@ from turtao.state import FaceDetection
 
 FACE_MISSING_RECORD_THRESHOLD = 0.5   # seconds
 FACE_MISSING_ALERT_THRESHOLD = 2.0    # seconds
+FACE_MISSING_ALARM_THRESHOLD = 10.0   # seconds
 PERSON_ABSENT_GRACE_PERIOD = 1.0      # seconds
 
 
@@ -18,6 +19,7 @@ class _PersonTimer:
     last_seen_at: float = 0.0
     recorded: bool = False
     alerted: bool = False
+    alarmed: bool = False
 
 
 class LoiterMonitor:
@@ -39,6 +41,7 @@ class LoiterMonitor:
         now: float,
         record_crop: Callable[[np.ndarray, tuple[int, int, int, int]], None],
         emit_alert: Callable[[str], None],
+        emit_alarm: Callable[[int, str], None],
     ) -> None:
         seen_ids: set[int] = set()
 
@@ -63,12 +66,14 @@ class LoiterMonitor:
                 timer.first_missing_at = None
                 timer.recorded = False
                 timer.alerted = False
+                timer.alarmed = False
                 continue
 
             if self._face_overlaps(bbox, faces):
                 timer.first_missing_at = None
                 timer.recorded = False
                 timer.alerted = False
+                timer.alarmed = False
                 continue
 
             if timer.first_missing_at is None:
@@ -87,12 +92,27 @@ class LoiterMonitor:
                 )
                 timer.alerted = True
 
+            if missing_for >= FACE_MISSING_ALARM_THRESHOLD and not timer.alarmed:
+                emit_alarm(
+                    tracker_id,
+                    f"Unidentified person (tracker #{tracker_id}) lingering "
+                    f"for {FACE_MISSING_ALARM_THRESHOLD:.0f}s+",
+                )
+                timer.alarmed = True
+
         stale = [
             tid for tid, t in self._timers.items()
             if tid not in seen_ids and now - t.last_seen_at > PERSON_ABSENT_GRACE_PERIOD
         ]
         for tid in stale:
             del self._timers[tid]
+
+    def alarmed_ids(self) -> set[int]:
+        """tracker_ids currently past the 10s alarm threshold and not yet
+        resolved — cleared the same moment `update()` resets `alarmed`
+        (face resolves, presence lost, or the person leaves frame), so a
+        snapshot right after `update()` reflects who's alarming *now*."""
+        return {tid for tid, t in self._timers.items() if t.alarmed}
 
     @staticmethod
     def _face_overlaps(

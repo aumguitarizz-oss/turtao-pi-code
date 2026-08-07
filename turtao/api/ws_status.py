@@ -138,14 +138,21 @@ class StatusBroadcaster:
             return []
         if w <= 0 or h <= 0:
             return []
+        alarmed_ids = getattr(self._state, "alarmed_person_ids", set())
         out = []
         for p in getattr(self._state, "latest_persons", []):
             if p.get("class_name") != "Person":
                 continue
             left, top, right, bottom = p["bbox"]
+            tracker_id = p.get("tracker_id", -1)
             out.append({
                 "box": [left / w, top / h, (right - left) / w, (bottom - top) / h],
-                "tracker_id": p.get("tracker_id", -1),
+                "tracker_id": tracker_id,
+                # true once this tracker_id has been unresolved (no
+                # matching face) for LoiterMonitor's 10s alarm threshold —
+                # distinct from threat.label, which only reflects an
+                # actually-resolved face match.
+                "alarm": tracker_id in alarmed_ids,
             })
         return out
 
