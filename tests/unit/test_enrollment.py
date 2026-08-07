@@ -1,5 +1,6 @@
 import threading
 import time
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -10,6 +11,53 @@ from turtao.vision.enrollment import EnrollmentManager
 @pytest.fixture
 def manager(tmp_path):
     return EnrollmentManager(tmp_path)
+
+
+class TestStrictFaceScanToggle:
+    """settings.strict_face_scan: when off, a merely low-quality scan
+    (blurry/too_dark/etc) is no longer rejected — but a face still has to
+    be detected and encodable regardless."""
+
+    @patch("turtao.vision.enrollment.face_recognition")
+    @patch("turtao.vision.enrollment.cv2")
+    def test_blurry_frame_rejected_when_strict(self, mock_cv2, mock_fr, tmp_path):
+        mock_fr.face_locations.return_value = [(100, 300, 300, 100)]
+        mock_fr.face_encodings.return_value = [np.zeros(128)]
+        mock_cv2.cvtColor.return_value = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        manager = EnrollmentManager(tmp_path, SimpleNamespace(strict_face_scan=True))
+        with patch.object(manager, "check_quality", return_value="blurry"):
+            result = manager._process_single_frame(np.zeros((480, 640, 3), dtype=np.uint8))
+
+        assert result["ok"] is False
+        assert result["issue"] == "blurry"
+
+    @patch("turtao.vision.enrollment.face_recognition")
+    @patch("turtao.vision.enrollment.cv2")
+    def test_blurry_frame_accepted_when_not_strict(self, mock_cv2, mock_fr, tmp_path):
+        mock_fr.face_locations.return_value = [(100, 300, 300, 100)]
+        mock_fr.face_encodings.return_value = [np.zeros(128)]
+        mock_cv2.cvtColor.return_value = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        manager = EnrollmentManager(tmp_path, SimpleNamespace(strict_face_scan=False))
+        with patch.object(manager, "check_quality", return_value="blurry"):
+            result = manager._process_single_frame(np.zeros((480, 640, 3), dtype=np.uint8))
+
+        assert result["ok"] is True
+
+    @patch("turtao.vision.enrollment.face_recognition")
+    @patch("turtao.vision.enrollment.cv2")
+    def test_no_face_still_rejected_when_not_strict(self, mock_cv2, mock_fr, tmp_path):
+        # Disabling strict mode skips the *quality* gate only — it must not
+        # bypass the more fundamental "was a face even detected" check.
+        mock_fr.face_locations.return_value = []
+        mock_cv2.cvtColor.return_value = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        manager = EnrollmentManager(tmp_path, SimpleNamespace(strict_face_scan=False))
+        result = manager._process_single_frame(np.zeros((480, 640, 3), dtype=np.uint8))
+
+        assert result["ok"] is False
+        assert result["issue"] == "no_face"
 
 
 class TestCollectBurstSamplesDistinctFrames:

@@ -67,7 +67,12 @@ QUALITY_GUIDANCE: dict[str, str] = {
 
 
 class EnrollmentManager:
-    def __init__(self, face_data_dir: Path) -> None:
+    def __init__(self, face_data_dir: Path, settings: Any = None) -> None:
+        # Read live off the shared Settings object (not snapshotted) so
+        # flipping the toggle takes effect on the very next capture, no
+        # restart needed — the user asked for this specifically to use
+        # right before a demo.
+        self._settings = settings
         self._face_data_dir = face_data_dir
         self._embeddings_dir = face_data_dir / "embeddings"
         self._embeddings_dir.mkdir(parents=True, exist_ok=True)
@@ -292,9 +297,13 @@ class EnrollmentManager:
             return {"ok": False, "issue": "multi_face", "frame": raw_frame, "embedding": None}
 
         face_loc = face_locs[0]
-        quality_issue = self.check_quality(raw_frame, face_loc)
-        if quality_issue is not None:
-            return {"ok": False, "issue": quality_issue, "frame": raw_frame, "embedding": None}
+        # Settings' strict_face_scan toggle: when off, a merely imperfect
+        # scan (too_far/blurry/too_dark/too_bright) is no longer rejected —
+        # a face still has to be detected and encodable regardless.
+        if self._settings is None or self._settings.strict_face_scan:
+            quality_issue = self.check_quality(raw_frame, face_loc)
+            if quality_issue is not None:
+                return {"ok": False, "issue": quality_issue, "frame": raw_frame, "embedding": None}
 
         with DLIB_LOCK:
             encodings = face_recognition.face_encodings(rgb, [face_loc])

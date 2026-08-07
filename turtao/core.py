@@ -60,7 +60,7 @@ class TurtaoCore:
         self.face_engine.load_embeddings(str(face_data_dir / "embeddings"))
         self.tracker = PersonTracker(model_path)
         self.antispoof = AntiSpoofDetector()
-        self.enrollment = EnrollmentManager(face_data_dir)
+        self.enrollment = EnrollmentManager(face_data_dir, settings)
         self.pose_tracker = PoseTracker(state)
         self.loiter_monitor = LoiterMonitor()
 

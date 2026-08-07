@@ -38,6 +38,12 @@ class Settings(BaseModel):
     intercom_volume: float = 0.7
     face_tolerance: float = 0.52
     anti_spoof_enabled: bool = True
+    # When False, enrollment skips the too_far/blurry/too_dark/too_bright
+    # quality gate (check_quality) — a face still has to be detected and
+    # encodable, but a merely imperfect scan is no longer rejected. Useful
+    # for a fast, uninterrupted enrollment (e.g. a live demo) at the cost
+    # of weaker embeddings from lower-quality poses.
+    strict_face_scan: bool = True
     speed: float = 0.8
     safe_mode: bool = False
     auto_flashbang: bool = False
