@@ -145,8 +145,13 @@ def get_tts_message(state: AppState, boot: bool = False, mode_changed: bool = Fa
         return _msg_for("low_battery")
     _PREV_BATTERY = batt
 
-    o = state.sensor_data.orientation
-    if abs(o.pitch) > 45 or abs(o.roll) > 45:
+    # No fused orientation exists on real hardware (GY-91 gives raw
+    # accel/gyro only) — use accel-vector-magnitude deviation from 1g as a
+    # mounting-orientation-independent "something physically abnormal"
+    # signal instead of a pitch/roll angle threshold.
+    imu = state.sensor_data.imu
+    accel_mag = (imu.accel_x ** 2 + imu.accel_y ** 2 + imu.accel_z ** 2) ** 0.5
+    if abs(accel_mag - 1.0) > 0.5:
         return _msg_for("tamper")
 
     return None

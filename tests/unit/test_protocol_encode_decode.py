@@ -28,30 +28,24 @@ class TestEncodeCommand:
 
 class TestDecodePayload:
     def test_valid_json_round_trip(self):
+        # Matches the confirmed ESP32-S3 firmware's sendSensorPayload().
         valid = {
-            "temp_inside_c": 30.2,
-            "humidity_pct": 65,
-            "temp_outside_c": 28.5,
-            "gas_mq2": 120,
-            "air_quality_mq135": 85,
-            "sound_level": 42.3,
-            "motion": False,
-            "pitch": 0.5,
-            "roll": -0.2,
-            "yaw": 1.1,
-            "accel_x": 0.01,
-            "accel_y": -0.02,
-            "accel_z": 9.81,
-            "tof_fl": 50,
-            "tof_fc": 120,
-            "tof_fr": 200,
-            "tof_down": 300,
-            "voltage": 12.4,
-            "current_ma": 150,
-            "battery_pct": 95.0,
-            "motor_controller_ok": True,
-            "firmware_version": "v2.1.0",
-            "ble_devices": [],
+            "tof_fl": 340,
+            "tof_fc": 18,
+            "tof_fr": None,
+            "tof_down": 27,
+            "accel_x": -0.71,
+            "accel_y": 0.60,
+            "accel_z": -0.27,
+            "gyro_x": -4.27,
+            "gyro_y": 3.56,
+            "gyro_z": -0.70,
+            "gas_mq2": 0.74,
+            "gas_mq135": 0.0,
+            "sound_raw": 1871,
+            "temp_dht": 22.2,
+            "humidity": 74.2,
+            "pir": True,
         }
         line = json.dumps(valid)
         success, data = decode_payload(line)
@@ -125,7 +119,7 @@ class TestValidatePayload:
 
     def test_missing_field_fails(self):
         payload = {field: None for field in REQUIRED_SENSOR_FIELDS}
-        del payload["temp_inside_c"]
+        del payload["temp_dht"]
         assert validate_payload(payload) is False
 
     def test_empty_dict_fails(self):
@@ -141,31 +135,30 @@ class TestValidatePayload:
 
 
 class TestValidatePayloadRejectsOldFieldNames:
-    def test_rejects_payload_still_using_old_temp_bmp_and_pressure(self):
+    """The GY-91's BMP280 half is dead on this unit and was never read —
+    temp_bmp/pressure_hpa never existed in the confirmed firmware. Also
+    covers the earlier, more ambitious spec's fields (INA219 battery,
+    fused pitch/roll/yaw, ble_devices, etc.) that never shipped."""
+
+    def test_rejects_payload_missing_real_fields_even_with_extra_old_ones(self):
         old_style = {
             "temp_dht": 28.5,
-            "humidity_pct": 65,
             "temp_bmp": 28.1,
             "pressure_hpa": 1013.2,
             "gas_mq2": 120,
-            "air_quality_mq135": 85,
             "sound_level": 42.3,
             "motion": False,
             "pitch": 0.5,
             "roll": -0.2,
             "yaw": 1.1,
-            "accel_x": 0.01,
-            "accel_y": -0.02,
-            "accel_z": 9.81,
-            "tof_fl": 50,
-            "tof_fc": 120,
-            "tof_fr": 200,
-            "tof_down": 300,
             "voltage": 12.4,
             "current_ma": 150,
             "battery_pct": 95.0,
             "motor_controller_ok": True,
             "firmware_version": "v2.1.0",
             "ble_devices": [],
+            # Missing: gyro_x/y/z, gas_mq135, sound_raw, humidity, pir,
+            # tof_fl/fc/fr/down, accel_x/y/z — so this still fails despite
+            # having temp_dht/gas_mq2 (real field names) present.
         }
         assert validate_payload(old_style) is False

@@ -246,7 +246,7 @@ class TurtaoCore:
     def _check_sensor_alerts(self) -> None:
         with self.state:
             gas = self.state.sensor_data.gas_mq2
-            temp = self.state.sensor_data.temp_inside_c
+            temp = self.state.sensor_data.temp_dht
 
         gas_bad = gas < self.settings.gas_threshold_low or gas > self.settings.gas_threshold_high
         # Rising-edge guard so a sustained out-of-range reading logs one
@@ -261,7 +261,10 @@ class TurtaoCore:
             self._gas_alert_active = False
 
         temp_low, temp_high = self.settings.temp_threshold_low, self.settings.temp_threshold_high
-        temp_bad = temp < temp_low or temp > temp_high
+        # temp_dht is None when the DHT22 read fails (isnan in firmware) —
+        # sensor absence, not an out-of-range reading, so skip the check
+        # rather than crash on a None comparison.
+        temp_bad = temp is not None and (temp < temp_low or temp > temp_high)
         if temp_bad and not self._temp_alert_active:
             self._temp_alert_active = True
             self.state.emit_event("temp_danger", f"Temperature reading out of range: {temp}°C")
@@ -295,21 +298,18 @@ class TurtaoCore:
     def _apply_sensor_data(self, data: dict[str, Any]) -> None:
         with self.state:
             s = self.state.sensor_data
-            s.temp_inside_c = data.get("temp_inside_c", s.temp_inside_c)
-            s.temp_outside_c = data.get("temp_outside_c", s.temp_outside_c)
-            s.humidity_pct = int(data.get("humidity_pct", s.humidity_pct))
+            s.temp_dht = data.get("temp_dht", s.temp_dht)
+            s.humidity = data.get("humidity", s.humidity)
             s.gas_mq2 = data.get("gas_mq2", s.gas_mq2)
-            s.air_quality_mq135 = data.get("air_quality_mq135", s.air_quality_mq135)
-            s.sound_level = data.get("sound_level", s.sound_level)
-            s.motion = data.get("motion", s.motion)
-            s.orientation.pitch = data.get("pitch", s.orientation.pitch)
-            s.orientation.roll = data.get("roll", s.orientation.roll)
-            s.orientation.yaw = data.get("yaw", s.orientation.yaw)
-            s.voltage = data.get("voltage", s.voltage)
-            s.current_ma = data.get("current_ma", s.current_ma)
-            s.battery_pct = data.get("battery_pct", s.battery_pct)
-            s.motor_controller_ok = data.get("motor_controller_ok", s.motor_controller_ok)
-            s.firmware_version = data.get("firmware_version", s.firmware_version)
+            s.air_quality_mq135 = data.get("gas_mq135", s.air_quality_mq135)
+            s.sound_raw = data.get("sound_raw", s.sound_raw)
+            s.motion = data.get("pir", s.motion)
+            s.imu.accel_x = data.get("accel_x", s.imu.accel_x)
+            s.imu.accel_y = data.get("accel_y", s.imu.accel_y)
+            s.imu.accel_z = data.get("accel_z", s.imu.accel_z)
+            s.imu.gyro_x = data.get("gyro_x", s.imu.gyro_x)
+            s.imu.gyro_y = data.get("gyro_y", s.imu.gyro_y)
+            s.imu.gyro_z = data.get("gyro_z", s.imu.gyro_z)
             tof = [
                 data.get("tof_fl", 0),
                 data.get("tof_fc", 0),

@@ -52,11 +52,5 @@ def mode():
         except Exception:
             logger.exception("Failed to send stop command on IDLE transition")
 
-    if ser is not None:
-        try:
-            ser.write(json.dumps({"cmd": "mode", "mode": new_mode}) + "\n")
-        except Exception:
-            logger.exception("Failed to send mode command to serial")
-
     logger.info("Mode set to %s", new_mode)
     return {"mode": new_mode}

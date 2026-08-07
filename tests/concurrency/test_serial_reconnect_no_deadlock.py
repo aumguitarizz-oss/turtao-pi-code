@@ -133,7 +133,13 @@ class TestSerialReconnect:
         with patch("turtao.serial_link.esp32_link.serial.Serial") as mock_ser_cls:
             mock_ser = MagicMock()
             mock_ser.is_open = True
-            mock_ser.readline.return_value = b'{"temp_inside_c":30.2,"humidity_pct":60,"gas_mq2":100,"air_quality_mq135":80,"sound_level":30,"motion":false,"pitch":0,"roll":0,"yaw":0,"accel_x":0,"accel_y":0,"accel_z":9.81,"tof_fl":50,"tof_fc":100,"tof_fr":150,"tof_down":200,"voltage":12.5,"current_ma":100,"battery_pct":90,"motor_controller_ok":true,"firmware_version":"v1","ble_devices":[],"temp_outside_c":25.0}\n'
+            mock_ser.readline.return_value = (
+                b'{"tof_fl":50,"tof_fc":100,"tof_fr":150,"tof_down":200,'
+                b'"accel_x":0,"accel_y":0,"accel_z":9.81,'
+                b'"gyro_x":0,"gyro_y":0,"gyro_z":0,'
+                b'"gas_mq2":100,"gas_mq135":80,"sound_raw":30,'
+                b'"temp_dht":30.2,"humidity":60,"pir":false}\n'
+            )
             mock_ser_cls.return_value = mock_ser
 
             link = ESP32SerialLink(config, state)
@@ -141,8 +147,8 @@ class TestSerialReconnect:
 
             result = link.poll_sensor()
             assert result is not None
-            assert result["temp_outside_c"] == 25.0
-            assert result["battery_pct"] == 90
+            assert result["temp_dht"] == 30.2
+            assert result["gas_mq135"] == 80
 
     def test_process_command_queue(self, state, config):
         with patch("turtao.serial_link.esp32_link.serial.Serial") as mock_ser_cls:
@@ -155,7 +161,7 @@ class TestSerialReconnect:
             link._connected = True
 
             state.serial_command_queue.append({"cmd": "move", "ml": 0.5, "mr": 0.5})
-            state.serial_command_queue.append({"cmd": "led", "mode": "strobe"})
+            state.serial_command_queue.append({"cmd": "servo", "pan": 90, "tilt": 90})
 
             link.process_command_queue()
 

@@ -51,29 +51,27 @@ class ThreatState:
 
 
 @dataclass
-class Orientation:
-    pitch: float = 0.0
-    roll: float = 0.0
-    yaw: float = 0.0
+class ImuReading:
+    """Raw accel/gyro off the GY-91 (MPU9250 half) — no fused orientation
+    exists on real hardware, so there's no pitch/roll/yaw to report."""
+    accel_x: float = 0.0
+    accel_y: float = 0.0
+    accel_z: float = 0.0
+    gyro_x: float = 0.0
+    gyro_y: float = 0.0
+    gyro_z: float = 0.0
 
 
 @dataclass
 class SensorData:
-    temp_inside_c: float = 0.0
-    temp_outside_c: float = 0.0
-    humidity_pct: int = 0
-    gas_mq2: int = 0
-    air_quality_mq135: int = 0
-    sound_level: float = 0.0
-    motion: bool = False
-    orientation: Orientation = field(default_factory=Orientation)
+    temp_dht: float | None = 0.0
+    humidity: float | None = 0.0
+    gas_mq2: float = 0.0
+    air_quality_mq135: float = 0.0
+    sound_raw: int = 0
+    motion: bool = False  # sourced from the firmware's `pir` field
+    imu: ImuReading = field(default_factory=ImuReading)
     tof_cm: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
-    voltage: float = 0.0
-    current_ma: int = 0
-    battery_pct: float = 0.0
-    motor_controller_ok: bool = True
-    firmware_version: str = ""
-    ble_devices: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

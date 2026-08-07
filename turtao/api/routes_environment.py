@@ -20,17 +20,19 @@ def get_environment():
         return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
     sd = st.sensor_data
     return {
-        "temp_inside_c": sd.temp_inside_c,
-        "temp_outside_c": sd.temp_outside_c,
-        "humidity_pct": sd.humidity_pct,
+        "temp_dht": sd.temp_dht,
+        "humidity": sd.humidity,
         "gas_mq2": sd.gas_mq2,
         "air_quality_mq135": sd.air_quality_mq135,
-        "sound_level": sd.sound_level,
+        "sound_raw": sd.sound_raw,
         "motion": sd.motion,
-        "orientation": {
-            "pitch": sd.orientation.pitch,
-            "roll": sd.orientation.roll,
-            "yaw": sd.orientation.yaw,
+        "imu": {
+            "accel_x": sd.imu.accel_x,
+            "accel_y": sd.imu.accel_y,
+            "accel_z": sd.imu.accel_z,
+            "gyro_x": sd.imu.gyro_x,
+            "gyro_y": sd.imu.gyro_y,
+            "gyro_z": sd.imu.gyro_z,
         },
         "tof_cm": sd.tof_cm,
     }
@@ -53,13 +55,8 @@ def test_sensor_alert():
 
 @environment_bp.route("/api/battery")
 def get_battery():
-    st = _deps.get("state")
-    if st is None:
-        return {"error": "SERVICE_UNAVAILABLE", "detail": "State not available"}, 503
-    b = st.battery
-    return {
-        "voltage": b.voltage,
-        "current_ma": b.current_ma,
-        "percent": b.percent,
-        "status": b.status,
-    }
+    # No INA219 (or any battery monitoring hardware) on this build — the
+    # confirmed ESP32-S3 firmware has no battery-related field anywhere in
+    # its sensor payload. Report unavailable rather than fabricating a
+    # reading (state.battery was always its 0.0 defaults; nothing fed it).
+    return {"error": "SERVICE_UNAVAILABLE", "detail": "No battery hardware on this build"}, 503

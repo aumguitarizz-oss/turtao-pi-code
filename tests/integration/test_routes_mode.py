@@ -58,12 +58,13 @@ class TestModeRoutes:
         data = resp.get_json()
         assert data["error"] == "VALIDATION_ERROR"
 
-    def test_post_sends_mode_to_serial(self, client, mock_serial):
+    def test_post_non_idle_mode_sends_nothing_to_serial(self, client, mock_serial):
+        # "mode" isn't a command the confirmed firmware recognizes — mode
+        # is tracked Pi-side only. Only an IDLE transition sends anything
+        # (a real move e-stop), covered separately.
         mock_serial.open()
         client.post("/api/mode", json={"mode": "PATROL"})
-        assert len(mock_serial.written) >= 1
-        payload = json.loads(mock_serial.written[0])
-        assert payload == {"cmd": "mode", "mode": "PATROL"}
+        assert mock_serial.written == []
 
     def test_state_updated_on_post(self, client, mock_state):
         client.post("/api/mode", json={"mode": "PATROL"})

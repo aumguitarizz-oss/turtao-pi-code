@@ -49,7 +49,7 @@ class TestControlRoute:
         mock_serial.open()
         client.post("/api/control", json={"pan": 120, "tilt": 60})
         payload = json.loads(mock_serial.written[-1])
-        assert payload["cmd"] == "pan_tilt"
+        assert payload["cmd"] == "servo"
         # 0-centered API degrees shift by +90 into 90-centered servo space,
         # then clamp to [PAN_MIN, PAN_MAX] / [TILT_MIN, TILT_MAX].
         assert payload["pan"] == 175  # 120 + 90 = 210, clamped to PAN_MAX

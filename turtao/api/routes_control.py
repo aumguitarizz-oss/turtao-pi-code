@@ -70,7 +70,7 @@ def control():
         # (PAN_MIN..PAN_MAX / TILT_MIN..TILT_MAX), so shift by +90 before clamping.
         cmd_pan = max(PAN_MIN, min(PAN_MAX, int(pan) + 90)) if pan is not None else None
         cmd_tilt = max(TILT_MIN, min(TILT_MAX, int(tilt) + 90)) if tilt is not None else None
-        payload: dict = {"cmd": "pan_tilt"}
+        payload: dict = {"cmd": "servo"}
         if cmd_pan is not None:
             payload["pan"] = cmd_pan
         if cmd_tilt is not None:

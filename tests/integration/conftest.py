@@ -23,10 +23,6 @@ class MockState:
         self.threat_label = ThreatLabel.IDLE
         self.battery = BatteryData()
         self.sensor_data = SensorData()
-        self.sensor_data.ble_devices = [
-            {"id": "dev1", "name": "JBL Go 3", "rssi": -45, "owner": True},
-            {"id": "dev2", "name": "Pixel 7", "rssi": -60, "owner": False},
-        ]
         self.heading = 0
         self.latency_ms = 0
         self.speed = 1.0

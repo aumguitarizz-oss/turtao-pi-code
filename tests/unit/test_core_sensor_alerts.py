@@ -29,27 +29,27 @@ def core(tmp_path):
 class TestCheckSensorAlerts:
     def test_gas_within_range_emits_nothing(self, core):
         core.state.sensor_data.gas_mq2 = 200
-        core.state.sensor_data.temp_inside_c = 22.0
+        core.state.sensor_data.temp_dht = 22.0
         core._check_sensor_alerts()
         assert len(core.state.events) == 0
 
     def test_gas_above_high_threshold_emits_gas_danger(self, core):
         core.state.sensor_data.gas_mq2 = 500
-        core.state.sensor_data.temp_inside_c = 22.0
+        core.state.sensor_data.temp_dht = 22.0
         core._check_sensor_alerts()
         types = [e.type for e in core.state.events]
         assert types == ["gas_danger"]
 
     def test_gas_below_low_threshold_emits_gas_danger(self, core):
         core.state.sensor_data.gas_mq2 = 10
-        core.state.sensor_data.temp_inside_c = 22.0
+        core.state.sensor_data.temp_dht = 22.0
         core._check_sensor_alerts()
         types = [e.type for e in core.state.events]
         assert types == ["gas_danger"]
 
     def test_temp_out_of_range_emits_temp_danger(self, core):
         core.state.sensor_data.gas_mq2 = 200
-        core.state.sensor_data.temp_inside_c = 60.0
+        core.state.sensor_data.temp_dht = 60.0
         core._check_sensor_alerts()
         types = [e.type for e in core.state.events]
         assert types == ["temp_danger"]
@@ -58,7 +58,7 @@ class TestCheckSensorAlerts:
         # Rising-edge guard: repeated polls while still out of range must
         # not spam an event every second.
         core.state.sensor_data.gas_mq2 = 500
-        core.state.sensor_data.temp_inside_c = 22.0
+        core.state.sensor_data.temp_dht = 22.0
         core._check_sensor_alerts()
         core._check_sensor_alerts()
         core._check_sensor_alerts()
@@ -66,7 +66,7 @@ class TestCheckSensorAlerts:
 
     def test_alert_re_fires_after_returning_to_normal(self, core):
         core.state.sensor_data.gas_mq2 = 500
-        core.state.sensor_data.temp_inside_c = 22.0
+        core.state.sensor_data.temp_dht = 22.0
         core._check_sensor_alerts()  # fires
         core.state.sensor_data.gas_mq2 = 200
         core._check_sensor_alerts()  # back to normal, clears the guard
