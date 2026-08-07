@@ -5,20 +5,11 @@ import subprocess
 import threading
 from pathlib import Path
 
-from turtao.state import AppState, ThreatLabel
-
 logger = logging.getLogger(__name__)
 
 _PARENT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PIPER_DIR = _PARENT / "piper"
 DEFAULT_MODEL = "en_US-amy-medium.onnx"
-
-_BOOT_DONE = False
-_PREV_MODE: str = ""
-_PREV_THREAT: str = ""
-_PREV_GAS: int = 0
-_PREV_AIR: int = 0
-_PREV_BATTERY: float = 100.0
 
 
 class TTSManager:
@@ -91,78 +82,3 @@ class TTSManager:
             logger.error("TTS subprocess error: %s", e)
 
 
-_MSG_MAP: list[tuple[str, str]] = [
-    ("threat", "Intruder detected. Owner has been notified."),
-    ("gas_danger", "Warning. Hazardous gas detected."),
-    ("poor_air", "Warning. Poor air quality detected."),
-    ("tamper", "Warning. Do not touch this device."),
-    ("low_battery", "Battery critically low."),
-    ("wake_word", "Yes?"),
-]
-
-
-def reset_tts_tracking() -> None:
-    global _BOOT_DONE, _PREV_MODE, _PREV_THREAT, _PREV_GAS, _PREV_AIR, _PREV_BATTERY
-    _BOOT_DONE = False
-    _PREV_MODE = ""
-    _PREV_THREAT = ""
-    _PREV_GAS = 0
-    _PREV_AIR = 0
-    _PREV_BATTERY = 100.0
-
-
-def get_tts_message(state: AppState, boot: bool = False, mode_changed: bool = False) -> str | None:
-    global _BOOT_DONE, _PREV_MODE, _PREV_THREAT, _PREV_GAS, _PREV_AIR, _PREV_BATTERY
-
-    if boot and not _BOOT_DONE:
-        _BOOT_DONE = True
-        return "Turtao online."
-
-    if mode_changed and state.mode.value == "PATROL":
-        return "Surveillance active. Beginning patrol."
-
-    if _PREV_THREAT != "THREAT" and state.threat_label == ThreatLabel.THREAT:
-        _PREV_THREAT = "THREAT"
-        return _msg_for("threat")
-    if state.threat_label != ThreatLabel.THREAT:
-        _PREV_THREAT = "IDLE"
-
-    gas = state.sensor_data.gas_mq2
-    if _PREV_GAS <= 300 and gas > 300:
-        _PREV_GAS = gas
-        return _msg_for("gas_danger")
-    _PREV_GAS = gas
-
-    air = state.sensor_data.air_quality_mq135
-    if _PREV_AIR <= 400 and air > 400:
-        _PREV_AIR = air
-        return _msg_for("poor_air")
-    _PREV_AIR = air
-
-    batt = state.battery.percent
-    if _PREV_BATTERY >= 15 and batt < 15:
-        _PREV_BATTERY = batt
-        return _msg_for("low_battery")
-    _PREV_BATTERY = batt
-
-    # No fused orientation exists on real hardware (GY-91 gives raw
-    # accel/gyro only) — use accel-vector-magnitude deviation from 1g as a
-    # mounting-orientation-independent "something physically abnormal"
-    # signal instead of a pitch/roll angle threshold.
-    imu = state.sensor_data.imu
-    accel_mag = (imu.accel_x ** 2 + imu.accel_y ** 2 + imu.accel_z ** 2) ** 0.5
-    if abs(accel_mag - 1.0) > 0.5:
-        return _msg_for("tamper")
-
-    return None
-
-
-def _msg_for(key: str) -> str | None:
-    for k, msg in _MSG_MAP:
-        if k == key:
-            return msg
-    return None
-
-
-def is_wake_word_tts_enabled() -> bool:
-    return _msg_for("wake_word") is not None

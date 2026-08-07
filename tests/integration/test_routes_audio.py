@@ -47,3 +47,20 @@ class TestAudioRoutes:
         data = {"audio": (io.BytesIO(b"fake m4a bytes"), "clip.m4a")}
         resp = client.post("/api/audio/play", data=data, content_type="multipart/form-data")
         assert resp.status_code == 200
+
+    def test_temp_file_preserves_the_uploaded_extension(self, client):
+        # Regression: this used to hardcode ".m4a" regardless of what was
+        # actually uploaded. aplay (what TTSManager shells out to) can only
+        # decode raw PCM/WAV, not AAC/M4A -- a real .wav upload getting
+        # silently relabeled .m4a masked exactly the kind of mismatch that
+        # broke soundboard playback on real hardware.
+        from turtao.api import routes_audio
+        tts = MagicMock()
+        routes_audio.inject_deps(tts=tts)
+        data = {"audio": (io.BytesIO(b"RIFF....WAVEfmt "), "clip.wav")}
+        resp = client.post("/api/audio/play", data=data, content_type="multipart/form-data")
+        assert resp.status_code == 200
+
+        tmp_path = tts.play_file.call_args.args[0]
+        assert tmp_path.endswith(".wav")
+        os.unlink(tmp_path)

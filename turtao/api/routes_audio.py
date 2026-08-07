@@ -30,7 +30,14 @@ def play_audio():
     if tts is None:
         return {"error": "SERVICE_UNAVAILABLE", "detail": "TTS not available"}, 503
 
-    with tempfile.NamedTemporaryFile(suffix=".m4a", delete=False) as tmp:
+    # aplay (what TTSManager._execute_play_file shells out to) only decodes
+    # raw PCM/WAV -- it cannot play AAC/M4A at all. This used to hardcode
+    # ".m4a" regardless of what was actually uploaded, which silently broke
+    # playback for the app's own AAC-encoded soundboard recordings (now
+    # switched to WAV). Preserve the real extension so a mismatch here is
+    # at least visible instead of masked by a wrong-but-plausible suffix.
+    suffix = Path(audio_file.filename).suffix or ".wav"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         audio_file.save(tmp.name)
         tmp_path = tmp.name
 
