@@ -132,7 +132,14 @@ class TurtaoCore:
             else:
                 with self.state:
                     self.state.threat_label = ThreatLabel.IDLE
-            time.sleep(0.03)
+            # dlib's HOG detector isn't cheap on ARM without SSE/AVX — at a
+            # 0.03s sleep this loop re-runs detection almost immediately
+            # after each call finishes, effectively pinning a full CPU core
+            # continuously regardless of whether anyone's in frame (measured
+            # ~280% sustained CPU in Guard/Patrol on real Pi hardware, before
+            # any detection even happens). 5 attempts/sec is still fast
+            # enough to catch someone entering frame for a patrol robot.
+            time.sleep(0.2)
 
     def _tracker_wrapper(self) -> None:
         """Pull latest frame and push through YOLO + ByteTrack."""
