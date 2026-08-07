@@ -162,7 +162,8 @@ fi
 
 # ── Systemd service ─────────────────────────────────────────────────
 echo ">>> Installing systemd service..."
-sudo cp "$SYSTEMD_DIR/turtao.service" /etc/systemd/system/turtao.service
+sed -e "s|__USER__|$USER|g" -e "s|__WORKDIR__|$REPO_DIR|g" \
+    "$SYSTEMD_DIR/turtao.service" | sudo tee /etc/systemd/system/turtao.service > /dev/null
 sudo systemctl daemon-reload
 
 # ── Done ────────────────────────────────────────────────────────────
