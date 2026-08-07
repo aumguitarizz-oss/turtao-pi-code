@@ -23,18 +23,7 @@ def get_environment():
         "temp_dht": sd.temp_dht,
         "humidity": sd.humidity,
         "gas_mq2": sd.gas_mq2,
-        "air_quality_mq135": sd.air_quality_mq135,
-        "sound_raw": sd.sound_raw,
-        "motion": sd.motion,
-        "imu": {
-            "accel_x": sd.imu.accel_x,
-            "accel_y": sd.imu.accel_y,
-            "accel_z": sd.imu.accel_z,
-            "gyro_x": sd.imu.gyro_x,
-            "gyro_y": sd.imu.gyro_y,
-            "gyro_z": sd.imu.gyro_z,
-        },
-        "tof_cm": sd.tof_cm,
+        "tof_front": sd.tof_front,
     }
 
 

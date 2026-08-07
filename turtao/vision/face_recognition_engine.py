@@ -19,35 +19,10 @@ logger = logging.getLogger(__name__)
 UNKNOWN_SAVE_INTERVAL = 2.0
 TTS_DEBOUNCE_INTERVAL = 5.0
 RESIZE_SCALE = 0.5
-KP_PAN = 0.18
-KP_TILT = 0.22
-DEADZONE = 30
-PAN_MIN = 10
-PAN_MAX = 170
-TILT_MIN = 10
-TILT_MAX = 170
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-10))
-
-
-def _calculate_aim(
-    l: int, t: int, r: int, b: int, frame_w: int = 640, frame_h: int = 480
-) -> tuple[int, int]:
-    cx = (l + r) / 2
-    cy = (t + b) / 2
-    dx = cx - frame_w / 2
-    dy = cy - frame_h / 2
-    pan = 90
-    tilt = 90
-    if abs(dx) > DEADZONE:
-        pan = int(90 + dx * KP_PAN)
-    if abs(dy) > DEADZONE:
-        tilt = int(90 + dy * KP_TILT)
-    pan = max(PAN_MIN, min(PAN_MAX, pan))
-    tilt = max(TILT_MIN, min(TILT_MAX, tilt))
-    return pan, tilt
 
 
 @dataclass
@@ -321,11 +296,6 @@ class FaceRecognitionEngine:
                 ))
             elif not threat_faces:
                 self._threat_event_active = False
-
-            if match_label == ThreatLabel.THREAT:
-                pan, tilt = _calculate_aim(*summary.box)
-                self._state.pan = pan
-                self._state.tilt = tilt
 
     def _update_threat_state(
         self,

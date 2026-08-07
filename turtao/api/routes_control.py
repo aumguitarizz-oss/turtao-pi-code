@@ -12,10 +12,6 @@ control_bp = Blueprint("control", __name__)
 
 _deps: dict = {}
 
-PAN_MIN = 5
-PAN_MAX = 175
-TILT_MIN = 60
-TILT_MAX = 120
 MOVE_CLAMP = 0.8
 
 
@@ -36,8 +32,6 @@ def control():
     speed = body.get("speed")
     nerf = body.get("nerf")
     safe_mode = body.get("safe_mode")
-    pan = body.get("pan")
-    tilt = body.get("tilt")
 
     if speed is not None:
         if not isinstance(speed, (int, float)):
@@ -64,22 +58,6 @@ def control():
             settings_obj.save()
         except Exception:
             logger.exception("Failed to persist safe_mode setting")
-
-    if pan is not None or tilt is not None:
-        # The API is 0-centered degrees (-90..+90); servo space is 90-centered
-        # (PAN_MIN..PAN_MAX / TILT_MIN..TILT_MAX), so shift by +90 before clamping.
-        cmd_pan = max(PAN_MIN, min(PAN_MAX, int(pan) + 90)) if pan is not None else None
-        cmd_tilt = max(TILT_MIN, min(TILT_MAX, int(tilt) + 90)) if tilt is not None else None
-        payload: dict = {"cmd": "servo"}
-        if cmd_pan is not None:
-            payload["pan"] = cmd_pan
-        if cmd_tilt is not None:
-            payload["tilt"] = cmd_tilt
-        if ser is not None:
-            try:
-                ser.write(json.dumps(payload) + "\n")
-            except Exception:
-                logger.exception("Failed to send pan/tilt command")
 
     return {"ok": True}
 

@@ -3,21 +3,6 @@ import pytest
 
 
 class TestControlRoute:
-    def test_pan_tilt_zero_centers_maps_to_servo_ninety(self, client, mock_serial):
-        mock_serial.open()
-        resp = client.post("/api/control", json={"pan": 0, "tilt": 0})
-        assert resp.status_code == 200
-        payload = json.loads(mock_serial.written[-1])
-        assert payload["pan"] == 90
-        assert payload["tilt"] == 90
-
-    def test_pan_tilt_clamped_to_servo_range(self, client, mock_serial):
-        mock_serial.open()
-        client.post("/api/control", json={"pan": -90, "tilt": 90})
-        payload = json.loads(mock_serial.written[-1])
-        assert payload["pan"] == 5
-        assert payload["tilt"] == 120
-
     def test_post_control_sends_commands(self, client, mock_serial, mock_settings):
         # A plain speed/safe_mode update (no estop, no pan/tilt) is only
         # persisted to settings; the route sends nothing to the ESP32 for it.
@@ -44,16 +29,6 @@ class TestControlRoute:
         assert resp.status_code == 200
         assert resp.get_json() == {"ok": True}
         assert mock_serial.written == []
-
-    def test_post_control_pan_tilt(self, client, mock_serial):
-        mock_serial.open()
-        client.post("/api/control", json={"pan": 120, "tilt": 60})
-        payload = json.loads(mock_serial.written[-1])
-        assert payload["cmd"] == "servo"
-        # 0-centered API degrees shift by +90 into 90-centered servo space,
-        # then clamp to [PAN_MIN, PAN_MAX] / [TILT_MIN, TILT_MAX].
-        assert payload["pan"] == 175  # 120 + 90 = 210, clamped to PAN_MAX
-        assert payload["tilt"] == 120  # 60 + 90 = 150, clamped to TILT_MAX
 
     def test_estop_sent_when_speed_zero_and_safe_mode(self, client, mock_serial, mock_state):
         mock_serial.open()

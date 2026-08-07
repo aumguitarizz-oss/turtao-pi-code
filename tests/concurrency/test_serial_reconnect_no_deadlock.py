@@ -134,11 +134,8 @@ class TestSerialReconnect:
             mock_ser = MagicMock()
             mock_ser.is_open = True
             mock_ser.readline.return_value = (
-                b'{"tof_fl":50,"tof_fc":100,"tof_fr":150,"tof_down":200,'
-                b'"accel_x":0,"accel_y":0,"accel_z":9.81,'
-                b'"gyro_x":0,"gyro_y":0,"gyro_z":0,'
-                b'"gas_mq2":100,"gas_mq135":80,"sound_raw":30,'
-                b'"temp_dht":30.2,"humidity":60,"pir":false}\n'
+                b'{"tof_front":150,"gas_mq2":100,'
+                b'"temp_dht":30.2,"humidity":60}\n'
             )
             mock_ser_cls.return_value = mock_ser
 
@@ -148,7 +145,7 @@ class TestSerialReconnect:
             result = link.poll_sensor()
             assert result is not None
             assert result["temp_dht"] == 30.2
-            assert result["gas_mq135"] == 80
+            assert result["tof_front"] == 150
 
     def test_process_command_queue(self, state, config):
         with patch("turtao.serial_link.esp32_link.serial.Serial") as mock_ser_cls:

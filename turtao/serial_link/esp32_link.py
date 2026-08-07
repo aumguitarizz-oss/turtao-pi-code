@@ -131,21 +131,7 @@ class ESP32SerialLink(SerialLinkInterface):
                         sd.temp_dht = sensor.get("temp_dht")
                         sd.humidity = sensor.get("humidity")
                         sd.gas_mq2 = sensor.get("gas_mq2", 0.0)
-                        sd.air_quality_mq135 = sensor.get("gas_mq135", 0.0)
-                        sd.sound_raw = sensor.get("sound_raw", 0)
-                        sd.motion = sensor.get("pir", False)
-                        sd.imu.accel_x = sensor.get("accel_x", 0.0)
-                        sd.imu.accel_y = sensor.get("accel_y", 0.0)
-                        sd.imu.accel_z = sensor.get("accel_z", 0.0)
-                        sd.imu.gyro_x = sensor.get("gyro_x", 0.0)
-                        sd.imu.gyro_y = sensor.get("gyro_y", 0.0)
-                        sd.imu.gyro_z = sensor.get("gyro_z", 0.0)
-                        sd.tof_cm = [
-                            sensor.get("tof_fl", 0) or 0,
-                            sensor.get("tof_fc", 0) or 0,
-                            sensor.get("tof_fr", 0) or 0,
-                            sensor.get("tof_down", 0) or 0,
-                        ]
+                        sd.tof_front = sensor.get("tof_front")
                         self._state.connected = True
                 time.sleep(0.05)
             except Exception:

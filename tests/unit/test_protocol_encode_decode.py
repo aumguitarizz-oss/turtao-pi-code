@@ -28,24 +28,12 @@ class TestEncodeCommand:
 
 class TestDecodePayload:
     def test_valid_json_round_trip(self):
-        # Matches the confirmed ESP32-S3 firmware's sendSensorPayload().
+        # Matches the stripped-build ESP32-S3 firmware's sendSensorPayload().
         valid = {
-            "tof_fl": 340,
-            "tof_fc": 18,
-            "tof_fr": None,
-            "tof_down": 27,
-            "accel_x": -0.71,
-            "accel_y": 0.60,
-            "accel_z": -0.27,
-            "gyro_x": -4.27,
-            "gyro_y": 3.56,
-            "gyro_z": -0.70,
+            "tof_front": 340,
             "gas_mq2": 0.74,
-            "gas_mq135": 0.0,
-            "sound_raw": 1871,
             "temp_dht": 22.2,
             "humidity": 74.2,
-            "pir": True,
         }
         line = json.dumps(valid)
         success, data = decode_payload(line)
@@ -157,8 +145,7 @@ class TestValidatePayloadRejectsOldFieldNames:
             "motor_controller_ok": True,
             "firmware_version": "v2.1.0",
             "ble_devices": [],
-            # Missing: gyro_x/y/z, gas_mq135, sound_raw, humidity, pir,
-            # tof_fl/fc/fr/down, accel_x/y/z — so this still fails despite
+            # Missing: humidity, tof_front — so this still fails despite
             # having temp_dht/gas_mq2 (real field names) present.
         }
         assert validate_payload(old_style) is False

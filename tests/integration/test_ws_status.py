@@ -37,7 +37,7 @@ class TestStatusBroadcaster:
         mock_state.battery.percent = 75.0
         mock_state.battery.voltage = 12.3
         mock_state.heading = 90
-        mock_state.sensor_data.tof_cm = [50, 120, 200, 300]
+        mock_state.sensor_data.tof_front = 50
         mock_state.latency_ms = 15
 
         broadcaster = StatusBroadcaster(mock_state)
@@ -52,9 +52,7 @@ class TestStatusBroadcaster:
         assert data["battery"]["percent"] == 75.0
         assert data["battery"]["voltage"] == 12.3
         assert data["heading"] == 90
-        assert data["tof"]["fl"] == 50
-        assert data["tof"]["fc"] == 120
-        assert data["tof"]["fr"] == 200
+        assert data["tof_front"] == 50
         assert data["latency_ms"] == 15
 
     def test_build_status_defaults(self, mock_state):
@@ -68,9 +66,7 @@ class TestStatusBroadcaster:
         assert data["battery"]["percent"] == 0.0
         assert data["battery"]["voltage"] == 0.0
         assert data["heading"] == 0
-        assert data["tof"]["fl"] == 0
-        assert data["tof"]["fc"] == 0
-        assert data["tof"]["fr"] == 0
+        assert data["tof_front"] is None
         assert data["latency_ms"] == 0
 
     def test_build_status_normalizes_box_against_real_frame(self, mock_state):

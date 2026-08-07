@@ -27,16 +27,9 @@ class SensorsTab:
             ("Temp (DHT22)", "temp_dht", "°C"),
             ("Humidity", "humidity", "%"),
             ("Gas (MQ-2)", "gas_mq2", "V"),
-            ("Air Quality (MQ-135)", "air_quality_mq135", "V"),
-            ("Sound (raw ADC)", "sound_raw", ""),
-            ("Motion (PIR)", "motion", ""),
         ]
 
         sys_fields = [
-            ("Accel X/Y/Z (g)", "accel", ""),
-            ("Gyro X/Y/Z (°/s)", "gyro", ""),
-            ("Pan", "pan", "°"),
-            ("Tilt", "tilt", "°"),
             ("Heading", "heading", "°"),
             ("Connected", "connected", ""),
             ("Latency", "latency_ms", "ms"),
@@ -56,14 +49,11 @@ class SensorsTab:
         for label, key, unit in sys_fields:
             self._add_row(right, label, key, unit)
 
-        tof_labels = ["Front-Left", "Front-Center", "Front-Right", "Down"]
-        for i, lbl in enumerate(tof_labels):
-            key = f"tof_{i}"
-            self._vars[key] = tk.StringVar(value="0")
-            ttk.Label(tof_inner, text=f"{lbl}:").grid(row=0, column=i * 2, padx=(5, 2))
-            ttk.Label(tof_inner, textvariable=self._vars[key], width=6).grid(
-                row=0, column=i * 2 + 1, padx=(0, 10)
-            )
+        self._vars["tof_front"] = tk.StringVar(value="0")
+        ttk.Label(tof_inner, text="Front:").grid(row=0, column=0, padx=(5, 2))
+        ttk.Label(tof_inner, textvariable=self._vars["tof_front"], width=6).grid(
+            row=0, column=1, padx=(0, 10)
+        )
 
     def _add_row(
         self, parent: ttk.Frame, label: str, key: str, unit: str
@@ -87,23 +77,13 @@ class SensorsTab:
             self._set("temp_dht", "—" if s.temp_dht is None else f"{s.temp_dht:.1f}")
             self._set("humidity", "—" if s.humidity is None else f"{s.humidity:.1f}")
             self._set("gas_mq2", f"{s.gas_mq2:.2f}")
-            self._set("air_quality_mq135", f"{s.air_quality_mq135:.2f}")
-            self._set("sound_raw", str(s.sound_raw))
-            self._set("motion", "Yes" if s.motion else "No")
-            imu = s.imu
-            self._set("accel", f"{imu.accel_x:.2f} / {imu.accel_y:.2f} / {imu.accel_z:.2f}")
-            self._set("gyro", f"{imu.gyro_x:.2f} / {imu.gyro_y:.2f} / {imu.gyro_z:.2f}")
-            self._set("pan", str(self.core.state.pan))
-            self._set("tilt", str(self.core.state.tilt))
             self._set("heading", str(self.core.state.heading))
             self._set("connected", "Yes" if self.core.state.connected else "No")
             self._set("latency_ms", str(self.core.state.latency_ms))
             self._set("mode", self.core.state.mode.value)
             self._set("threat_label", self.core.state.threat_label.value)
 
-            tof = s.tof_cm
-            for i in range(4):
-                self._set(f"tof_{i}", str(tof[i]) if i < len(tof) else "0")
+            self._set("tof_front", "0" if s.tof_front is None else str(s.tof_front))
 
     def _set(self, key: str, value: str) -> None:
         if key in self._vars:

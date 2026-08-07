@@ -303,23 +303,7 @@ class TurtaoCore:
             s.temp_dht = data.get("temp_dht", s.temp_dht)
             s.humidity = data.get("humidity", s.humidity)
             s.gas_mq2 = data.get("gas_mq2", s.gas_mq2)
-            s.air_quality_mq135 = data.get("gas_mq135", s.air_quality_mq135)
-            s.sound_raw = data.get("sound_raw", s.sound_raw)
-            s.motion = data.get("pir", s.motion)
-            s.imu.accel_x = data.get("accel_x", s.imu.accel_x)
-            s.imu.accel_y = data.get("accel_y", s.imu.accel_y)
-            s.imu.accel_z = data.get("accel_z", s.imu.accel_z)
-            s.imu.gyro_x = data.get("gyro_x", s.imu.gyro_x)
-            s.imu.gyro_y = data.get("gyro_y", s.imu.gyro_y)
-            s.imu.gyro_z = data.get("gyro_z", s.imu.gyro_z)
-            tof = [
-                data.get("tof_fl", 0),
-                data.get("tof_fc", 0),
-                data.get("tof_fr", 0),
-                data.get("tof_down", 0),
-            ]
-            if any(v != 0 for v in tof):
-                s.tof_cm = tof
+            s.tof_front = data.get("tof_front", s.tof_front)
             self.state.connected = True
 
     def _wake_word_wrapper(self) -> None:

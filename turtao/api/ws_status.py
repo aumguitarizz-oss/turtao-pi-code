@@ -102,11 +102,7 @@ class StatusBroadcaster:
                         "state": b.status.upper(),
                     },
                     "heading": st.heading,
-                    "tof": {
-                        "fl": sd.tof_cm[0] if len(sd.tof_cm) > 0 else 0,
-                        "fc": sd.tof_cm[1] if len(sd.tof_cm) > 1 else 0,
-                        "fr": sd.tof_cm[2] if len(sd.tof_cm) > 2 else 0,
-                    },
+                    "tof_front": sd.tof_front,
                     "latency_ms": st.latency_ms,
                     "persons": self._normalized_persons(),
                 },

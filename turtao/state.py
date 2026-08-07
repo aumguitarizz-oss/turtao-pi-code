@@ -51,27 +51,15 @@ class ThreatState:
 
 
 @dataclass
-class ImuReading:
-    """Raw accel/gyro off the GY-91 (MPU9250 half) — no fused orientation
-    exists on real hardware, so there's no pitch/roll/yaw to report."""
-    accel_x: float = 0.0
-    accel_y: float = 0.0
-    accel_z: float = 0.0
-    gyro_x: float = 0.0
-    gyro_y: float = 0.0
-    gyro_z: float = 0.0
-
-
-@dataclass
 class SensorData:
+    """Stripped-build sensor set — MQ-2 gas, DHT22 temp/humidity, and a
+    single front-facing VL53L0X ToF. See
+    inos/turtao_esp32_firmware1_copy_20260807222228.ino's
+    sendSensorPayload() for the source of truth."""
     temp_dht: float | None = 0.0
     humidity: float | None = 0.0
     gas_mq2: float = 0.0
-    air_quality_mq135: float = 0.0
-    sound_raw: int = 0
-    motion: bool = False  # sourced from the firmware's `pir` field
-    imu: ImuReading = field(default_factory=ImuReading)
-    tof_cm: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
+    tof_front: int | None = None
 
 
 @dataclass
@@ -93,8 +81,6 @@ class AppState:
         self.heading: int = 0
         self.connected: bool = False
         self.latency_ms: int = 0
-        self.pan: int = 90
-        self.tilt: int = 90
         self.frame_counter: int = 0
         self.latest_frame: np.ndarray | None = None
         self.latest_annotated_frame: np.ndarray | None = None

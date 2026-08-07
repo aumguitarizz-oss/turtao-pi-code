@@ -6,15 +6,12 @@ from typing import Any, TypedDict
 
 logger = logging.getLogger(__name__)
 
-# Matches the confirmed ESP32-S3 firmware's sendSensorPayload() exactly —
-# see turtao-esp32-firmware.ino. Any field can independently be null (a
-# missing sensor or failed read), so this only checks presence, not value.
+# Matches the stripped-build ESP32-S3 firmware's sendSensorPayload()
+# exactly — see inos/turtao_esp32_firmware1_copy_20260807222228.ino.
+# Any field can independently be null (a missing sensor or failed
+# read), so this only checks presence, not value.
 REQUIRED_SENSOR_FIELDS: set[str] = {
-    "tof_fl", "tof_fc", "tof_fr", "tof_down",
-    "accel_x", "accel_y", "accel_z",
-    "gyro_x", "gyro_y", "gyro_z",
-    "gas_mq2", "gas_mq135", "sound_raw",
-    "temp_dht", "humidity", "pir",
+    "tof_front", "gas_mq2", "temp_dht", "humidity",
 }
 
 

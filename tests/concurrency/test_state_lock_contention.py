@@ -59,7 +59,7 @@ class TestStateLockContention:
                     with app_state:
                         app_state.sensor_data.temp_dht = float(i)
                         app_state.sensor_data.gas_mq2 = float(i * 2)
-                        app_state.sensor_data.sound_raw = i
+                        app_state.sensor_data.tof_front = i
                 except Exception as e:
                     errors.append(e)
 
@@ -69,7 +69,7 @@ class TestStateLockContention:
                     with app_state:
                         t_in = app_state.sensor_data.temp_dht
                         t_out = app_state.sensor_data.gas_mq2
-                        h = app_state.sensor_data.sound_raw
+                        h = app_state.sensor_data.tof_front
                     assert isinstance(t_in, float)
                     assert isinstance(t_out, float)
                     assert isinstance(h, int)
@@ -152,13 +152,8 @@ class TestStateLockContention:
                         app_state.frame_counter += 1
                         app_state.heading = (app_state.heading + 1) % 360
                         if app_state.frame_counter % 10 == 0:
-                            app_state.sensor_data.tof_cm = [
-                                app_state.frame_counter % 100,
-                                (app_state.frame_counter + 10) % 100,
-                                (app_state.frame_counter + 20) % 100,
-                                (app_state.frame_counter + 30) % 100,
-                            ]
-                        _ = len(app_state.sensor_data.tof_cm)
+                            app_state.sensor_data.tof_front = app_state.frame_counter % 100
+                        _ = app_state.sensor_data.tof_front
                 except Exception as e:
                     errors.append(e)
                 time.sleep(0.001)

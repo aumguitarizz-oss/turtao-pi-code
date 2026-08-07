@@ -3,16 +3,7 @@ class TestEnvironmentRoutes:
         mock_state.sensor_data.temp_dht = 31.0
         mock_state.sensor_data.humidity = 60.0
         mock_state.sensor_data.gas_mq2 = 150
-        mock_state.sensor_data.air_quality_mq135 = 90
-        mock_state.sensor_data.sound_raw = 1871
-        mock_state.sensor_data.motion = True
-        mock_state.sensor_data.imu.accel_x = 1.2
-        mock_state.sensor_data.imu.accel_y = -0.5
-        mock_state.sensor_data.imu.accel_z = 0.8
-        mock_state.sensor_data.imu.gyro_x = 0.1
-        mock_state.sensor_data.imu.gyro_y = -0.2
-        mock_state.sensor_data.imu.gyro_z = 0.3
-        mock_state.sensor_data.tof_cm = [45, 120, 200, 300]
+        mock_state.sensor_data.tof_front = 300
 
         resp = client.get("/api/environment")
         assert resp.status_code == 200
@@ -22,16 +13,10 @@ class TestEnvironmentRoutes:
         assert data["humidity"] == 60.0
         assert "pressure_hpa" not in data
         assert data["gas_mq2"] == 150
-        assert data["air_quality_mq135"] == 90
-        assert data["sound_raw"] == 1871
-        assert data["motion"] is True
-        assert data["imu"]["accel_x"] == 1.2
-        assert data["imu"]["accel_y"] == -0.5
-        assert data["imu"]["accel_z"] == 0.8
-        assert data["imu"]["gyro_x"] == 0.1
-        assert data["imu"]["gyro_y"] == -0.2
-        assert data["imu"]["gyro_z"] == 0.3
-        assert data["tof_cm"] == [45, 120, 200, 300]
+        assert data["tof_front"] == 300
+        assert "air_quality_mq135" not in data
+        assert "motion" not in data
+        assert "imu" not in data
 
     def test_get_environment_defaults(self, client):
         resp = client.get("/api/environment")
@@ -39,8 +24,7 @@ class TestEnvironmentRoutes:
         data = resp.get_json()
         assert data["temp_dht"] == 0.0
         assert data["humidity"] == 0.0
-        assert data["motion"] is False
-        assert data["tof_cm"] == [0, 0, 0, 0]
+        assert data["tof_front"] is None
 
     def test_get_battery_is_unavailable(self, client):
         # No INA219 (or any battery monitoring hardware) on this build —
@@ -50,12 +34,13 @@ class TestEnvironmentRoutes:
         data = resp.get_json()
         assert data["error"] == "SERVICE_UNAVAILABLE"
 
-    def test_environment_tof_cm_structure(self, client, mock_state):
-        mock_state.sensor_data.tof_cm = [10, 20, 30, 40]
+    def test_environment_tof_front_null_when_out_of_range(self, client, mock_state):
+        # The .ino reports null (not 0) when the ToF is out of range or
+        # sees no target -- must round-trip as null, not a fabricated 0.
+        mock_state.sensor_data.tof_front = None
         resp = client.get("/api/environment")
         data = resp.get_json()
-        assert len(data["tof_cm"]) == 4
-        assert data["tof_cm"] == [10, 20, 30, 40]
+        assert data["tof_front"] is None
 
     def test_test_alert_route_emits_gas_and_temp_events(self, client, mock_state):
         resp = client.post("/api/sensors/test-alert")
