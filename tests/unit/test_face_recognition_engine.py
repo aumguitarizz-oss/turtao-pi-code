@@ -240,6 +240,22 @@ class TestUnknowns:
         assert unknowns[0].first_seen == "2026-01-01T12:00:00"
         assert unknowns[0].cluster_count == 1
 
+    def test_list_unknowns_skips_unparseable_filenames_instead_of_crashing(self, engine):
+        # Regression: a single file whose name doesn't match
+        # unknown_<YYYYMMDD_HHMMSS>.jpg (e.g. a duplicate a sync tool
+        # renamed with a "_158"-style suffix) used to raise ValueError and
+        # 500 the entire /api/faces/unknowns endpoint instead of just
+        # being skipped.
+        unknown_dir = engine._embeddings_dir.parent / "unknowns"
+        unknown_dir.mkdir(parents=True)
+        (unknown_dir / "unknown_20260101_120000.jpg").write_bytes(b"fake")
+        (unknown_dir / "unknown_20260101_120000_158.jpg").write_bytes(b"fake")
+
+        unknowns = engine.list_unknowns()
+
+        assert len(unknowns) == 1
+        assert unknowns[0].id == "unknown_20260101_120000"
+
     def test_get_unknown_thumb_returns_bytes(self, engine):
         unknown_dir = engine._embeddings_dir.parent / "unknowns"
         unknown_dir.mkdir(parents=True)

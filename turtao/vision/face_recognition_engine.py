@@ -142,9 +142,17 @@ class FaceRecognitionEngine:
         out = []
         for jpg in sorted(unknown_dir.glob("unknown_*.jpg")):
             ts_str = jpg.stem.removeprefix("unknown_")
-            first_seen = time.strftime(
-                "%Y-%m-%dT%H:%M:%S", time.strptime(ts_str, "%Y%m%d_%H%M%S")
-            )
+            try:
+                first_seen = time.strftime(
+                    "%Y-%m-%dT%H:%M:%S", time.strptime(ts_str, "%Y%m%d_%H%M%S")
+                )
+            except ValueError:
+                # A single unparseable filename (e.g. a duplicate a sync
+                # tool renamed with a "_158"-style suffix) used to 500 the
+                # whole /api/faces/unknowns endpoint instead of just being
+                # skipped -- one bad file shouldn't take down the rest.
+                logger.warning("Skipping unknown-face file with unparseable name: %s", jpg.name)
+                continue
             out.append(UnknownFaceSummary(id=jpg.stem, first_seen=first_seen, cluster_count=1))
         return out
 

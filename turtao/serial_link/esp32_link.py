@@ -10,7 +10,12 @@ import serial
 
 from turtao.config import AppConfig
 from turtao.hardware.interfaces import SerialLinkInterface
-from turtao.serial_link.protocol import decode_payload, encode_command, validate_payload
+from turtao.serial_link.protocol import (
+    REQUIRED_SENSOR_FIELDS,
+    decode_payload,
+    encode_command,
+    validate_payload,
+)
 from turtao.state import AppState
 
 logger = logging.getLogger(__name__)
@@ -95,7 +100,11 @@ class ESP32SerialLink(SerialLinkInterface):
             return None
         if validate_payload(data):
             return data
-        logger.warning("Sensor payload missing required fields")
+        missing = REQUIRED_SENSOR_FIELDS - data.keys()
+        logger.warning(
+            "Sensor payload missing required fields: missing=%s received=%s",
+            sorted(missing), sorted(data.keys()),
+        )
         return None
 
     def write_command(self, cmd: dict[str, Any]) -> bool:
