@@ -27,10 +27,11 @@ _MULTIPLIER = 2.0
 # emits a sensor payload in direct response to a {"cmd":"sensors"} line --
 # it never pushes readings on its own -- so without this, poll_sensor()
 # only ever sees whatever's already on the wire (move/estop acks), never
-# an actual reading. 500ms is frequent enough for the app's 3s
-# /api/environment poll while leaving headroom for the ESP32's own
-# blocking VL53L0X ranging call and the bumper's 100ms ToF sampling.
-_SENSOR_POLL_INTERVAL = 0.5
+# an actual reading. The app only polls /api/environment every 3s, so
+# there's no benefit to refreshing faster than that; 1.5s keeps the data
+# reasonably fresh while cutting CPU/serial/ESP32-ranging load roughly in
+# a third versus the original 500ms.
+_SENSOR_POLL_INTERVAL = 1.5
 
 
 class ESP32SerialLink(SerialLinkInterface):
