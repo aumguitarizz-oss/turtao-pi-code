@@ -36,13 +36,12 @@ def control():
     if speed is not None:
         if not isinstance(speed, (int, float)):
             raise APIError("speed must be a number", "VALIDATION_ERROR", 400)
-        if settings_obj is not None:
-            settings_obj.speed = speed
-            try:
-                settings_obj.save()
-            except Exception:
-                logger.exception("Failed to persist speed setting")
+
         if speed == 0 and safe_mode is True:
+            # Emergency stop: halt immediately, but don't persist 0 as the
+            # new default speed -- that would silently zero every future
+            # /api/move command (ml/mr are scaled by settings.speed) until
+            # someone manually restores it in Settings.
             if st is not None:
                 st.mode = Mode.IDLE
             if ser is not None:
@@ -51,6 +50,13 @@ def control():
                 except Exception:
                     logger.exception("Failed to send estop")
             return {"ok": True}
+
+        if settings_obj is not None:
+            settings_obj.speed = speed
+            try:
+                settings_obj.save()
+            except Exception:
+                logger.exception("Failed to persist speed setting")
 
     if safe_mode is not None and settings_obj is not None:
         settings_obj.safe_mode = safe_mode

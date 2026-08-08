@@ -48,6 +48,18 @@ class TestControlRoute:
         client.post("/api/control", json={"speed": 0.5, "safe_mode": True})
         assert not any(b"estop" in w for w in mock_serial.written)
 
+    def test_estop_does_not_zero_the_persisted_speed_setting(
+        self, client, mock_serial, mock_state, mock_settings
+    ):
+        # Regression: the e-stop button sends {speed: 0, safe_mode: true}.
+        # That used to get persisted as the new default speed, silently
+        # zeroing every future /api/move command until manually fixed in
+        # Settings.
+        mock_serial.open()
+        mock_settings.speed = 0.8
+        client.post("/api/control", json={"speed": 0, "safe_mode": True})
+        assert mock_settings.speed == 0.8
+
     def test_post_control_no_body_returns_error(self, client):
         resp = client.post("/api/control", json=None)
         assert resp.status_code == 400
