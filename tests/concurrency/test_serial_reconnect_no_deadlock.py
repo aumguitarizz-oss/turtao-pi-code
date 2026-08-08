@@ -147,6 +147,30 @@ class TestSerialReconnect:
             assert result["temp_dht"] == 30.2
             assert result["tof_front"] == 150
 
+    def test_run_actually_requests_sensors_from_the_esp32(self, state, config):
+        # Regression: run() used to only passively read whatever line was
+        # already on the wire (poll_sensor()) without ever writing
+        # {"cmd":"sensors"} -- the firmware only emits a sensor payload in
+        # direct response to that command, so sensor data never arrived at
+        # all in practice, regardless of wiring/firmware correctness.
+        with patch("turtao.serial_link.esp32_link.serial.Serial") as mock_ser_cls:
+            mock_ser = MagicMock()
+            mock_ser.is_open = True
+            mock_ser.readline.return_value = b""
+            mock_ser_cls.return_value = mock_ser
+
+            link = ESP32SerialLink(config, state)
+
+            t = threading.Thread(target=link.run, daemon=True)
+            t.start()
+
+            time.sleep(0.2)
+            state.stop_event.set()
+            t.join(timeout=5)
+
+            writes = [c[0][0] for c in mock_ser.write.call_args_list]
+            assert any(b'"cmd":"sensors"' in w for w in writes)
+
     def test_process_command_queue(self, state, config):
         with patch("turtao.serial_link.esp32_link.serial.Serial") as mock_ser_cls:
             mock_ser = MagicMock()

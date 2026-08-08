@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 _INITIAL_BACKOFF = 1.0
 _MAX_BACKOFF = 30.0
 _MULTIPLIER = 2.0
+# How often to ask the ESP32 for a sensor reading. The firmware only ever
+# emits a sensor payload in direct response to a {"cmd":"sensors"} line --
+# it never pushes readings on its own -- so without this, poll_sensor()
+# only ever sees whatever's already on the wire (move/estop acks), never
+# an actual reading. 500ms is frequent enough for the app's 3s
+# /api/environment poll while leaving headroom for the ESP32's own
+# blocking VL53L0X ranging call and the bumper's 100ms ToF sampling.
+_SENSOR_POLL_INTERVAL = 0.5
 
 
 class ESP32SerialLink(SerialLinkInterface):
@@ -31,6 +39,7 @@ class ESP32SerialLink(SerialLinkInterface):
         self._state = state
         self._ser: serial.Serial | None = None
         self._lock = Lock()
+        self._last_sensor_request = 0.0
 
     def _detect_port(self) -> str | None:
         port = self._config.esp32_port
@@ -133,6 +142,10 @@ class ESP32SerialLink(SerialLinkInterface):
                     logger.info("Serial link connected")
                     backoff = _INITIAL_BACKOFF
                 self.process_command_queue()
+                now = time.monotonic()
+                if now - self._last_sensor_request >= _SENSOR_POLL_INTERVAL:
+                    self._last_sensor_request = now
+                    self.write_command({"cmd": "sensors"})
                 sensor = self.poll_sensor()
                 if sensor is not None:
                     with self._state:
