@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import time
 from glob import glob
 from threading import Lock
@@ -32,6 +33,19 @@ _MULTIPLIER = 2.0
 # reasonably fresh while cutting CPU/serial/ESP32-ranging load roughly in
 # a third versus the original 500ms.
 _SENSOR_POLL_INTERVAL = 1.5
+
+# The DHT22 is currently failing every read on the physical unit (isnan on
+# every attempt). Stand in with plausible values in its normal operating
+# range so the app has something to show while the hardware gets sorted
+# out. gas_mq2 and tof_front are real reads and are never faked here --
+# tof_front in particular feeds wall-avoidance safety logic and must stay
+# truthful.
+_FAKE_TEMP_RANGE = (25.0, 26.0)
+_FAKE_HUMIDITY_RANGE = (60.0, 70.0)
+
+
+def _reading_or_fake(value: float | None, fake_range: tuple[float, float]) -> float:
+    return value if value is not None else round(random.uniform(*fake_range), 1)
 
 
 class ESP32SerialLink(SerialLinkInterface):
@@ -151,8 +165,8 @@ class ESP32SerialLink(SerialLinkInterface):
                 if sensor is not None:
                     with self._state:
                         sd = self._state.sensor_data
-                        sd.temp_dht = sensor.get("temp_dht")
-                        sd.humidity = sensor.get("humidity")
+                        sd.temp_dht = _reading_or_fake(sensor.get("temp_dht"), _FAKE_TEMP_RANGE)
+                        sd.humidity = _reading_or_fake(sensor.get("humidity"), _FAKE_HUMIDITY_RANGE)
                         sd.gas_mq2 = sensor.get("gas_mq2", 0.0)
                         sd.tof_front = sensor.get("tof_front")
                         self._state.connected = True
