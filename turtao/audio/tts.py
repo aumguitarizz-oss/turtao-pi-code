@@ -17,6 +17,7 @@ class TTSManager:
         self._piper_dir = Path(piper_dir) if piper_dir else DEFAULT_PIPER_DIR
         self._model_name = model_name
         self._lock = threading.Lock()
+        self._current_proc: subprocess.Popen | None = None
 
     def speak(self, text: str) -> None:
         threading.Thread(
@@ -32,14 +33,36 @@ class TTSManager:
             daemon=True,
         ).start()
 
+    def _start_exclusive(self, args: list[str], **popen_kwargs) -> subprocess.Popen:
+        """Kills whatever's currently playing and starts a new process in
+        its place, atomically. Every play_file()/speak() call used to spawn
+        an independent thread with zero coordination between them --
+        self._lock was declared but never actually used -- so a burst of
+        taps piled up concurrent aplay processes all competing for the same
+        Bluetooth sink. They backed up and drained out later, in whatever
+        order the OS/BlueALSA happened to unblock them, which surfaced as a
+        long delay followed by an earlier tap's sound playing well after
+        the user had moved on. Now at most one audio process ever runs, and
+        the most recent request always wins immediately instead of queuing."""
+        with self._lock:
+            old = self._current_proc
+            if old is not None and old.poll() is None:
+                old.terminate()
+                try:
+                    old.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    old.kill()
+            proc = subprocess.Popen(args, **popen_kwargs)
+            self._current_proc = proc
+            return proc
+
     def _execute_play_file(self, path: str) -> None:
         try:
-            proc = subprocess.Popen(
-                ["aplay", path],
-                stderr=subprocess.DEVNULL,
-            )
+            proc = self._start_exclusive(["aplay", path], stderr=subprocess.DEVNULL)
             proc.wait()
-            if proc.returncode != 0:
+            # A negative returncode means a newer request preempted this
+            # one via terminate()/kill() -- expected, not a real failure.
+            if proc.returncode not in (0, None) and proc.returncode > 0:
                 logger.warning("aplay exited with code %d playing %s", proc.returncode, path)
         except OSError as e:
             logger.error("Audio playback subprocess error: %s", e)
@@ -71,11 +94,7 @@ class TTSManager:
             if echo.stdout:
                 echo.stdout.close()
             aplay_args = ["aplay", "-r", "22050", "-f", "S16_LE", "-t", "raw", "-"]
-            subprocess.Popen(
-                aplay_args,
-                stdin=piper.stdout,
-                stderr=subprocess.DEVNULL,
-            )
+            self._start_exclusive(aplay_args, stdin=piper.stdout, stderr=subprocess.DEVNULL)
             if piper.stdout:
                 piper.stdout.close()
         except OSError as e:
