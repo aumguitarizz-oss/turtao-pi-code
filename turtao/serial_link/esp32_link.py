@@ -126,8 +126,8 @@ class ESP32SerialLink(SerialLinkInterface):
             return data
         missing = REQUIRED_SENSOR_FIELDS - data.keys()
         logger.warning(
-            "Sensor payload missing required fields: missing=%s received=%s",
-            sorted(missing), sorted(data.keys()),
+            "Sensor payload missing required fields: missing=%s received=%s data=%s",
+            sorted(missing), sorted(data.keys()), data,
         )
         return None
 
