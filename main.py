@@ -40,7 +40,10 @@ def main():
         logger.info("Started with MOCK camera")
 
     from turtao.core import TurtaoCore
-    core = TurtaoCore(config=config, settings=settings, state=state, serial_link=serial_link, camera=camera)
+    core = TurtaoCore(
+        config=config, settings=settings, state=state,
+        serial_link=serial_link, camera=camera, gui=args.gui,
+    )
 
     if args.gui:
         import threading

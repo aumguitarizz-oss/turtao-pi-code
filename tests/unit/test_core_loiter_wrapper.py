@@ -70,6 +70,41 @@ class TestLoiterWrapperIntegration:
         assert "tracker #1" in core.state.events[0].message
 
 
+class TestTrackerWrapperPoseGating:
+    """pose_landmarks only feeds the debug GUI's recognition tab -- nothing
+    in the headless (systemd) path reads it, so running a full MediaPipe
+    pass on every frame there was pure wasted CPU. Gated on core._gui."""
+
+    def test_pose_tracker_does_not_run_by_default(self, core, monkeypatch):
+        pose_calls = []
+        monkeypatch.setattr(core.pose_tracker, "process_frame", pose_calls.append)
+        monkeypatch.setattr(core.tracker, "process_frame", lambda frame: [])
+        monkeypatch.setattr("turtao.core.time.sleep", lambda *_: core.state.stop_event.set())
+
+        with core.state:
+            core.state.mode = Mode.PATROL
+            core.state.latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        core._tracker_wrapper()
+
+        assert pose_calls == []
+
+    def test_pose_tracker_runs_when_gui_enabled(self, core, monkeypatch):
+        core._gui = True
+        pose_calls = []
+        monkeypatch.setattr(core.pose_tracker, "process_frame", pose_calls.append)
+        monkeypatch.setattr(core.tracker, "process_frame", lambda frame: [])
+        monkeypatch.setattr("turtao.core.time.sleep", lambda *_: core.state.stop_event.set())
+
+        with core.state:
+            core.state.mode = Mode.PATROL
+            core.state.latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        core._tracker_wrapper()
+
+        assert len(pose_calls) == 1
+
+
 class TestFaceRecognitionWrapperFrameGap:
     def test_transient_frame_gap_does_not_reset_threat_label(self, core, monkeypatch):
         """Regression: a momentary empty frame_queue (camera/producer hiccup,

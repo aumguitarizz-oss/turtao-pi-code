@@ -49,10 +49,16 @@ class TurtaoCore:
         face_data_dir: Path = BASE_DIR / "face_data",
         model_path: str = "models/yolov8n.onnx",
         piper_dir: Path = BASE_DIR / "piper",
+        gui: bool = False,
     ) -> None:
         self.config = config
         self.settings = settings
         self.state = state
+        # pose_landmarks is only ever read by the debug GUI's recognition
+        # tab (turtao/gui/tab_recognition.py) -- nothing in the headless
+        # production path (loiter/safety logic) consumes it, so running a
+        # full MediaPipe pass on every frame there was pure wasted CPU.
+        self._gui = gui
 
         self.serial = serial_link or ESP32SerialLink(config, state)
         self.camera = camera or Camera(config.camera_index)
@@ -170,7 +176,8 @@ class TurtaoCore:
                 except Exception:
                     logger.exception("Person tracker error")
 
-                self.pose_tracker.process_frame(frame)
+                if self._gui:
+                    self.pose_tracker.process_frame(frame)
             else:
                 with self.state:
                     self.state.pose_landmarks = []
